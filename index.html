@@ -1,0 +1,2592 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'"/>
+<title>Mesa de Distribuição — BKO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:        #080b11;
+  --surface:   #0e1219;
+  --panel:     #131824;
+  --card:      #181f2e;
+  --border:    #1e2740;
+  --border2:   #2a3550;
+  --accent:    #3b82f6;
+  --accent-g:  #10b981;
+  --accent-r:  #f43f5e;
+  --accent-y:  #f59e0b;
+  --accent-p:  #8b5cf6;
+  --text:      #e2e8f0;
+  --text2:     #94a3b8;
+  --text3:     #4a5568;
+  --glow:      #3b82f633;
+  --font:      'Syne', sans-serif;
+  --mono:      'JetBrains Mono', monospace;
+  --r:         12px;
+  --r-sm:      8px;
+  --r-xs:      6px;
+  --trans:     all .18s cubic-bezier(.4,0,.2,1);
+}
+
+body[data-theme="light"] {
+  --bg:        #f5f7fb;
+  --surface:   #ffffff;
+  --panel:     #eef3fb;
+  --card:      #ffffff;
+  --border:    #d9e2ef;
+  --border2:   #b9c7da;
+  --accent:    #2563eb;
+  --accent-g:  #059669;
+  --accent-r:  #e11d48;
+  --accent-y:  #d97706;
+  --accent-p:  #7c3aed;
+  --text:      #111827;
+  --text2:     #4b5563;
+  --text3:     #8a96a8;
+  --glow:      #2563eb22;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── CUSTOM TITLEBAR ──────────────────────────────────────────────────────── */
+#titlebar {
+  -webkit-app-region: drag;
+  height: 42px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  position: relative;
+  z-index: 100;
+}
+.tb-logo {
+  width: 26px; height: 26px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-p));
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: #fff;
+  flex-shrink: 0;
+}
+.tb-title { font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+.tb-sub { font-size: 10px; color: var(--text2); font-family: var(--mono); margin-left: 4px; }
+.tb-spacer { flex: 1; }
+.tb-btns { -webkit-app-region: no-drag; display: flex; gap: 6px; }
+.tb-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+  transition: var(--trans);
+}
+.tb-btn-min { background: #f59e0b22; color: var(--accent-y); }
+.tb-btn-max { background: #10b98122; color: var(--accent-g); }
+.tb-btn-cls { background: #f43f5e22; color: var(--accent-r); }
+.tb-btn:hover { opacity: .75; transform: scale(1.1); }
+.theme-toggle {
+  -webkit-app-region: no-drag;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: var(--trans);
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--text); }
+
+/* ── STATUS BAR ───────────────────────────────────────────────────────────── */
+#statusbar {
+  height: 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 20px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+.sb-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+.sb-dot.ok    { background: var(--accent-g); box-shadow: 0 0 6px var(--accent-g); }
+.sb-dot.warn  { background: var(--accent-y); box-shadow: 0 0 6px var(--accent-y); }
+.sb-dot.err   { background: var(--accent-r); box-shadow: 0 0 6px var(--accent-r); }
+.sb-dot.run   { background: var(--accent);   box-shadow: 0 0 6px var(--accent); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.sb-item { display: flex; align-items: center; gap: 6px; }
+.sb-sep { width: 1px; height: 14px; background: var(--border); }
+#autoCountdown { margin-left: auto; color: var(--accent); }
+
+/* ── MAIN LAYOUT ──────────────────────────────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: calc(100vh - 74px);
+}
+
+/* ── SIDEBAR ──────────────────────────────────────────────────────────────── */
+#sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#sidebar::-webkit-scrollbar { width: 3px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.nav-section {
+  font-size: 9px;
+  font-family: var(--mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 12px 8px 6px;
+}
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: var(--trans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.nav-btn:hover { background: var(--card); color: var(--text); }
+.nav-btn.active { background: var(--accent)18; color: var(--accent); }
+.nav-btn .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--accent)22;
+  color: var(--accent);
+  border-radius: 20px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-family: var(--mono);
+}
+
+/* ── CONTENT ──────────────────────────────────────────────────────────────── */
+#content {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.page { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+.page.active { display: flex; }
+
+/* ── PAGE HEADER ──────────────────────────────────────────────────────────── */
+.page-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.page-sub { font-size: 11px; color: var(--text2); margin-top: 2px; font-family: var(--mono); }
+.page-actions { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+/* ── BUTTONS ──────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: var(--trans);
+  font-family: var(--font);
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #2563eb; transform: translateY(-1px); box-shadow: 0 4px 20px var(--glow); }
+.btn-success { background: var(--accent-g); color: #fff; }
+.btn-success:hover:not(:disabled) { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 20px #10b98133; }
+.btn-danger  { background: var(--accent-r); color: #fff; }
+.btn-danger:hover:not(:disabled)  { background: #e11d48; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+}
+.btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.btn-amber { background: var(--accent-y); color: #000; }
+.btn-amber:hover:not(:disabled) { background: #d97706; transform: translateY(-1px); }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn-sm { padding: 6px 14px; font-size: 11px; }
+.btn-icon { padding: 8px; }
+
+/* ── TOGGLE SWITCH ───────────────────────────────────────────────────────── */
+.toggle-wrap { display: flex; align-items: center; gap: 10px; }
+.toggle {
+  position: relative; width: 40px; height: 22px;
+  cursor: pointer;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0;
+  background: var(--border2);
+  border-radius: 11px;
+  transition: var(--trans);
+}
+.toggle-slider:before {
+  content:''; position: absolute;
+  width: 16px; height: 16px;
+  left: 3px; top: 3px;
+  background: var(--text2);
+  border-radius: 50%;
+  transition: var(--trans);
+}
+.toggle input:checked + .toggle-slider { background: var(--accent-g); }
+.toggle input:checked + .toggle-slider:before { transform: translateX(18px); background: #fff; }
+.toggle-label { font-size: 12px; font-weight: 500; color: var(--text2); }
+
+/* ── CARDS ────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+}
+
+/* ── SCROLL AREA ──────────────────────────────────────────────────────────── */
+.scroll { overflow-y: auto; flex: 1; }
+.scroll::-webkit-scrollbar { width: 4px; }
+.scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  PAGE: GERAR BASE                                                           */
+/* ─────────────────────────────────────────────────────────────────────────── */
+#pg-gerar .scroll { padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Stats row ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-label { font-size: 10px; color: var(--text2); font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+.stat-value { font-size: 28px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+.stat-sub { font-size: 10px; color: var(--text2); font-family: var(--mono); }
+.stat-card.blue  .stat-value { color: var(--accent); }
+.stat-card.green .stat-value { color: var(--accent-g); }
+.stat-card.red   .stat-value { color: var(--accent-r); }
+.stat-card.amber .stat-value { color: var(--accent-y); }
+
+/* ── Filter grid ── */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.filter-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+}
+.filter-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.filter-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.filter-card-title span { font-size: 14px; }
+.clear-btn {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--text3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: var(--trans);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.clear-btn:hover { color: var(--accent-r); background: var(--accent-r)11; }
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.filter-actions .clear-btn:first-child:hover { color: var(--accent); background: var(--accent)11; }
+
+.tags-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 90px;
+  overflow-y: auto;
+}
+.tags-wrap::-webkit-scrollbar { width: 3px; }
+.tags-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.tag {
+  padding: 4px 11px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text2);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--trans);
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.tag:hover { border-color: var(--accent); color: var(--text); }
+.tag.sel {
+  background: var(--accent)22;
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
+.tag.sel.green { background: var(--accent-g)22; border-color: var(--accent-g); color: var(--accent-g); }
+.tag.sel.red   { background: var(--accent-r)22; border-color: var(--accent-r); color: var(--accent-r); }
+.tag.sel.amber { background: var(--accent-y)22; border-color: var(--accent-y); color: var(--accent-y); }
+.tag.sel.purple{ background: var(--accent-p)22; border-color: var(--accent-p); color: var(--accent-p); }
+
+/* ── Email filter ── */
+.input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.input-field {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--mono);
+  outline: none;
+  transition: var(--trans);
+}
+.input-field:focus { border-color: var(--accent); }
+.input-field::placeholder { color: var(--text3); }
+
+.email-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.email-chip {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--accent-p)18;
+  border: 1px solid var(--accent-p)44;
+  color: var(--accent-p);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-family: var(--mono);
+}
+.email-chip button {
+  background: none; border: none; cursor: pointer;
+  color: var(--accent-p); font-size: 12px; line-height: 1;
+  padding: 0; transition: var(--trans);
+}
+.email-chip button:hover { color: var(--accent-r); }
+
+/* ── Action bar ── */
+.action-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.action-divider { width: 1px; height: 28px; background: var(--border); }
+
+/* ── Progress ── */
+.progress-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+  display: none;
+}
+.progress-wrap.show { display: block; }
+.progress-bar-bg {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-p));
+  border-radius: 2px;
+  transition: width .4s ease;
+}
+.progress-log {
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  max-height: 80px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.progress-log::-webkit-scrollbar { width: 3px; }
+.progress-log .log-line { display: flex; gap: 8px; }
+.log-step { color: var(--accent); flex-shrink: 0; }
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  PAGE: CONFIG                                                               */
+/* ─────────────────────────────────────────────────────────────────────────── */
+#pg-config .scroll { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+.cfg-section-title {
+  font-size: 10px;
+  font-family: var(--mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 8px 0 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.cfg-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.cfg-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; font-family: var(--mono); }
+.cfg-path {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 11px;
+  font-family: var(--mono);
+  outline: none;
+  transition: var(--trans);
+  width: 100%;
+  text-overflow: ellipsis;
+}
+.cfg-path:focus { border-color: var(--accent); }
+.credential-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.credential-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.credential-title { font-size: 12px; font-weight: 700; }
+.credential-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* ── Auto config ── */
+.auto-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+}
+.auto-row .auto-info { flex: 1; }
+.auto-row .auto-title { font-size: 13px; font-weight: 600; }
+.auto-row .auto-sub { font-size: 11px; color: var(--text2); font-family: var(--mono); margin-top: 2px; }
+.num-input {
+  width: 60px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  padding: 6px 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: center;
+  outline: none;
+}
+.num-input:focus { border-color: var(--accent); }
+
+/* ── Toast ────────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(12px) scale(.96);
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+  z-index: 9999;
+  max-width: 400px;
+  border: 1px solid;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px #0008;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0) scale(1); }
+#toast.ok  { background: var(--accent-g)18; border-color: var(--accent-g)55; color: var(--accent-g); }
+#toast.err { background: var(--accent-r)18; border-color: var(--accent-r)55; color: var(--accent-r); }
+#toast.inf { background: var(--accent)18;   border-color: var(--accent)55;   color: var(--accent); }
+
+/* ── Spinner ──────────────────────────────────────────────────────────────── */
+.spin {
+  width: 13px; height: 13px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin .55s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Result block ─────────────────────────────────────────────────────────── */
+.result-block {
+  display: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+  gap: 14px;
+}
+.result-block.show { display: flex; flex-direction: column; }
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.result-icon { font-size: 22px; }
+.result-title { font-size: 15px; font-weight: 700; }
+.result-path { font-size: 10px; font-family: var(--mono); color: var(--text2); }
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.result-stat {
+  background: var(--panel);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+.result-stat .rs-val { font-size: 20px; font-weight: 700; color: var(--accent); }
+.result-stat .rs-lbl { font-size: 10px; color: var(--text2); font-family: var(--mono); }
+
+.bar-list { display: flex; flex-direction: column; gap: 6px; }
+.bar-item { display: flex; align-items: center; gap: 8px; }
+.bar-key { font-size: 10px; font-family: var(--mono); color: var(--text2); min-width: 80px; text-align: right; }
+.bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .6s ease; }
+.bar-num { font-size: 10px; font-family: var(--mono); color: var(--text2); min-width: 32px; }
+
+/* ── Auto mode highlight ─────────────────────────────────────────────────── */
+.auto-active-bar {
+  display: none;
+  background: var(--accent-g)12;
+  border: 1px solid var(--accent-g)33;
+  border-radius: var(--r-sm);
+  padding: 8px 14px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--accent-g);
+  align-items: center;
+  gap: 8px;
+}
+.auto-active-bar.show { display: flex; }
+.auto-active-bar .aa-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-g); animation: pulse 1.5s infinite; }
+
+/* ── Modo operação (action bar pills) ────────────────────────────────────── */
+.mode-pills {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  align-items: center;
+}
+.mode-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text2);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--trans);
+  font-family: var(--font);
+}
+.mode-pill:hover { border-color: var(--accent); color: var(--text); }
+.mode-pill:disabled { opacity: .45; cursor: not-allowed; }
+.mode-pill:disabled:hover { border-color: var(--border2); color: var(--text2); }
+.mode-pill.active {
+  background: var(--accent)22;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mode-pill.active.green {
+  background: var(--accent-g)22;
+  border-color: var(--accent-g);
+  color: var(--accent-g);
+}
+
+/* ── Genesys status indicator ────────────────────────────────────────────── */
+.genesys-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+
+/* SLA tag colors */
+.tag[data-sla="passivo"]:hover, .tag[data-sla="passivo"].sel { 
+  background: var(--accent-r)22; border-color: var(--accent-r); color: var(--accent-r); }
+.tag[data-sla="hoje"]:hover, .tag[data-sla="hoje"].sel { 
+  background: var(--accent-y)22; border-color: var(--accent-y); color: var(--accent-y); }
+.tag[data-sla="amanha"]:hover, .tag[data-sla="amanha"].sel { 
+  background: var(--accent)22; border-color: var(--accent); color: var(--accent); }
+
+.estado-tag { font-size: 10px; font-family: var(--mono); font-weight: 600; }
+
+/* Cleanup workspace */
+#pg-limpeza .scroll { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+#pg-extracoes .scroll { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.cleanup-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.cleanup-grid .input-field { min-width: 0; }
+.cleanup-filter {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cleanup-filter .cfg-label { margin-bottom: 0; }
+.multi-select {
+  height: 92px;
+  padding: 6px 8px;
+}
+.multi-select option {
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.multi-select option:checked {
+  background: var(--accent) !important;
+  color: #fff;
+}
+.cleanup-progress {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.cleanup-progress-item {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 10px;
+  min-width: 0;
+}
+.cleanup-progress-label {
+  font-size: 9px;
+  color: var(--text3);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.cleanup-progress-value {
+  margin-top: 3px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cleanup-progress-status {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.cleanup-progress-status.waiting {
+  border-color: var(--accent-y)66;
+  color: var(--accent-y);
+  background: var(--accent-y)10;
+}
+.table-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  min-height: 280px;
+}
+.mesa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.mesa-table th, .mesa-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+.mesa-table th {
+  color: var(--text2);
+  background: var(--panel);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: 600;
+}
+.mesa-table td { color: var(--text); }
+.mesa-table tr:hover td { background: #ffffff04; }
+body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
+.mesa-table .muted { color: var(--text3); }
+.mesa-table input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--accent); }
+.danger-zone {
+  border: 1px solid var(--accent-r)44;
+  background: var(--accent-r)0d;
+  border-radius: var(--r);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.danger-zone .danger-copy { flex: 1; }
+.danger-title { font-size: 12px; font-weight: 700; color: var(--accent-r); }
+.danger-sub { font-size: 10px; color: var(--text2); font-family: var(--mono); margin-top: 3px; }
+.cleanup-log {
+  max-height: 110px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+.cleanup-log div { margin-bottom: 4px; }
+.extract-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.extract-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.extract-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.extract-title { font-size: 13px; font-weight: 700; }
+.extract-runtime { font-size: 9px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; }
+.extract-status { font-size: 10px; font-family: var(--mono); color: var(--text2); min-height: 16px; }
+</style>
+</head>
+<body>
+
+<!-- TITLEBAR -->
+<div id="titlebar">
+  <div class="tb-logo">MD</div>
+  <span class="tb-title">Mesa de Distribuição</span>
+  <span class="tb-sub">Backoffice · v2.0</span>
+  <div class="tb-spacer"></div>
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">Modo claro</button>
+  <div class="tb-btns">
+    <button class="tb-btn tb-btn-min" onclick="api.minimize()">−</button>
+    <button class="tb-btn tb-btn-max" onclick="api.maximize()">□</button>
+    <button class="tb-btn tb-btn-cls" onclick="api.close()">×</button>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <div class="sb-item">
+    <div class="sb-dot" id="genesysDot"></div>
+    <span id="genesysStatus">Genesys: não conectado</span>
+  </div>
+  <div class="sb-sep"></div>
+  <div class="sb-item">
+    <div class="sb-dot" id="processDot"></div>
+    <span id="processStatus">Aguardando…</span>
+  </div>
+  <div class="sb-sep"></div>
+  <span id="lastRunLabel">Última execução: —</span>
+  <div class="sb-sep"></div>
+  <span id="autoCountdown"></span>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- SIDEBAR NAV -->
+  <nav id="sidebar">
+    <div class="nav-section">Principal</div>
+    <button class="nav-btn active" onclick="goPage('gerar')" id="nav-gerar">
+      <span class="nav-icon">⚡</span> Gerar Base
+    </button>
+    <button class="nav-btn" onclick="goPage('limpeza')" id="nav-limpeza">
+      <span class="nav-icon">L</span> Limpeza da Mesa
+    </button>
+    <button class="nav-btn" onclick="goPage('extracoes')" id="nav-extracoes">
+      <span class="nav-icon">B</span> Extrair Bases
+    </button>
+    <button class="nav-btn" onclick="goPage('auto')" id="nav-auto">
+      <span class="nav-icon">🔄</span> Modo Automático
+      <span class="nav-badge" id="autoBadge" style="display:none">ON</span>
+    </button>
+
+    <div class="nav-section">Sistema</div>
+    <button class="nav-btn" onclick="goPage('config')" id="nav-config">
+      <span class="nav-icon">⚙️</span> Configurações
+    </button>
+
+    <!-- Mini stats -->
+    <div style="flex:1"></div>
+    <div class="card" style="margin-top:12px; padding: 12px;">
+      <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;">Última geração</div>
+      <div id="sideLastTotal" style="font-size:22px;font-weight:700;color:var(--accent)">—</div>
+      <div style="font-size:10px;color:var(--text2);font-family:var(--mono)">registros</div>
+      <div style="height:1px;background:var(--border);margin:10px 0"></div>
+      <div style="font-size:10px;color:var(--text2);font-family:var(--mono)" id="sideLastTime">—</div>
+    </div>
+  </nav>
+
+  <!-- CONTENT AREA -->
+  <div id="content">
+
+    <!-- ══ PAGE: GERAR BASE ══════════════════════════════════════════════════ -->
+    <div class="page active" id="pg-gerar">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Gerar Base</div>
+          <div class="page-sub">Consolide as bases e aplique os filtros antes de subir na Mesa</div>
+        </div>
+        <div class="page-actions">
+          <div class="auto-active-bar" id="autoActiveBar">
+            <div class="aa-dot"></div>
+            Modo automático ativo — próxima execução em <strong id="autoNextIn" style="margin:0 4px">—</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="scroll">
+        <!-- Stats row -->
+        <div class="stats-row">
+          <div class="stat-card blue">
+            <div class="stat-label">Base original</div>
+            <div class="stat-value" id="stTotal">—</div>
+            <div class="stat-sub">apos filtros</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-label">Final p/ mesa</div>
+            <div class="stat-value" id="stNovos">—</div>
+            <div class="stat-sub">sem duplicados</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-label">Passivos</div>
+            <div class="stat-value" id="stPassivo">—</div>
+            <div class="stat-sub">SLA vencido</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-label">Vencem hoje</div>
+            <div class="stat-value" id="stHoje">—</div>
+            <div class="stat-sub">prioridade máxima</div>
+          </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-wrap" id="progressWrap">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="spin" style="color:var(--accent)"></div>
+            <span style="font-size:12px;font-weight:600" id="progressLabel">Processando…</span>
+          </div>
+          <div class="progress-bar-bg"><div class="progress-bar" id="progressBar" style="width:10%"></div></div>
+          <div class="progress-log" id="progressLog"></div>
+        </div>
+
+        <!-- Result block -->
+        <div class="result-block" id="resultBlock">
+          <div class="result-header">
+            <div class="result-icon">✅</div>
+            <div>
+              <div class="result-title" id="resultTitle">Base gerada com sucesso</div>
+              <div class="result-path" id="resultPath"></div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" id="btnOpenFolder">📂 Abrir pasta</button>
+            </div>
+          </div>
+          <div class="result-grid">
+            <div class="result-stat">
+              <div class="rs-val" id="rs1">—</div>
+              <div class="rs-lbl">Base original</div>
+            </div>
+            <div class="result-stat">
+              <div class="rs-val" id="rs2" style="color:var(--accent-r)">—</div>
+              <div class="rs-lbl">Removidos por duplicidade</div>
+            </div>
+            <div class="result-stat">
+              <div class="rs-val" id="rs3" style="color:var(--accent-g)">—</div>
+              <div class="rs-lbl">Final disponivel</div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Por estado</div>
+            <div class="bar-list" id="barEstado"></div>
+          </div>
+        </div>
+
+        <!-- Filters grid -->
+        <div style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:.1em;text-transform:uppercase;padding:4px 0">Filtros de exportação</div>
+
+        <div class="filter-grid">
+
+          <!-- Estado -->
+          <div class="filter-card">
+            <div class="filter-card-header">
+              <div class="filter-card-title"><span>🗺</span> Estado / Região</div>
+              <div class="filter-actions">
+                <button class="clear-btn" onclick="selectFilterAll('estados')">todos</button>
+                <button class="clear-btn" onclick="clearFilter('estados')">limpar</button>
+              </div>
+            </div>
+            <div class="tags-wrap" id="f-estados">
+              <span class="tag estado-tag" data-filter="estados" data-val="MA" onclick="toggleTag(this)">MA</span>
+              <span class="tag estado-tag" data-filter="estados" data-val="PA" onclick="toggleTag(this)">PA</span>
+              <span class="tag estado-tag" data-filter="estados" data-val="PI" onclick="toggleTag(this)">PI</span>
+              <span class="tag estado-tag" data-filter="estados" data-val="AL" onclick="toggleTag(this)">AL</span>
+              <span class="tag estado-tag" data-filter="estados" data-val="GO" onclick="toggleTag(this)">GO</span>
+              <span class="tag estado-tag" data-filter="estados" data-val="CEA" onclick="toggleTag(this)">CEA</span>
+              <span class="tag estado-tag" data-filter="estados" data-val="CEEE" onclick="toggleTag(this)">CEEE</span>
+              <span class="tag estado-tag" data-filter="estados" data-val="CSA" onclick="toggleTag(this)">CSA</span>
+            </div>
+          </div>
+
+          <!-- SLA -->
+          <div class="filter-card">
+            <div class="filter-card-header">
+              <div class="filter-card-title"><span>⏱</span> SLA / Prazo</div>
+              <div class="filter-actions">
+                <button class="clear-btn" onclick="selectFilterAll('sla')">todos</button>
+                <button class="clear-btn" onclick="clearFilter('sla')">limpar</button>
+              </div>
+            </div>
+            <div class="tags-wrap" id="f-sla">
+              <span class="tag" data-filter="sla" data-val="passivo" data-sla="passivo" onclick="toggleTag(this)">⚠ Passivo (vencido)</span>
+              <span class="tag" data-filter="sla" data-val="hoje"    data-sla="hoje"    onclick="toggleTag(this)">🔥 Vence Hoje</span>
+              <span class="tag" data-filter="sla" data-val="amanha"  data-sla="amanha"  onclick="toggleTag(this)">📅 No prazo (D+)</span>
+            </div>
+          </div>
+
+          <!-- Responsável -->
+          <div class="filter-card">
+            <div class="filter-card-header">
+              <div class="filter-card-title"><span>👤</span> Responsável</div>
+              <div class="filter-actions">
+                <button class="clear-btn" onclick="selectFilterAll('responsavel')">todos</button>
+                <button class="clear-btn" onclick="clearFilter('responsavel')">limpar</button>
+              </div>
+            </div>
+            <div class="tags-wrap" id="f-responsavel">
+              <span class="tag" data-filter="responsavel" data-val="BackOffice Varejo" onclick="toggleTag(this)">BackOffice Varejo</span>
+              <span class="tag" data-filter="responsavel" data-val="BackOffice GD"     onclick="toggleTag(this)">BackOffice GD</span>
+            </div>
+          </div>
+
+          <!-- Site -->
+          <div class="filter-card">
+            <div class="filter-card-header">
+              <div class="filter-card-title"><span>🌐</span> Origem / Site</div>
+              <div class="filter-actions">
+                <button class="clear-btn" onclick="selectFilterAll('sites')">todos</button>
+                <button class="clear-btn" onclick="clearFilter('sites')">limpar</button>
+              </div>
+            </div>
+            <div class="tags-wrap" id="f-sites">
+              <span class="tag" data-filter="sites" data-val="novo"    onclick="toggleTag(this)">✨ Site Novo</span>
+              <span class="tag" data-filter="sites" data-val="antigo"  onclick="toggleTag(this)">📋 Site Antigo</span>
+            </div>
+          </div>
+
+          <!-- Skill (dinâmico) -->
+          <div class="filter-card">
+            <div class="filter-card-header">
+              <div class="filter-card-title"><span>🎯</span> Skill</div>
+              <div class="filter-actions">
+                <button class="clear-btn" onclick="selectFilterAll('skills')">todos</button>
+                <button class="clear-btn" onclick="clearFilter('skills')">limpar</button>
+              </div>
+            </div>
+            <div class="tags-wrap" id="f-skills">
+              <span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Gere a base para ver as skills disponíveis</span>
+            </div>
+          </div>
+
+          <!-- Tipo de serviço (dinâmico) -->
+          <div class="filter-card">
+            <div class="filter-card-header">
+              <div class="filter-card-title"><span>🔧</span> Tipo de Serviço</div>
+              <div class="filter-actions">
+                <button class="clear-btn" onclick="selectFilterAll('tiposServico')">todos</button>
+                <button class="clear-btn" onclick="clearFilter('tiposServico')">limpar</button>
+              </div>
+            </div>
+            <div class="tags-wrap" id="f-tiposServico">
+              <span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Gere a base para ver os tipos disponíveis</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Email filter (full width) -->
+        <div class="filter-card" style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;">
+          <div class="filter-card-header">
+            <div class="filter-card-title"><span>📧</span> E-mail do cliente</div>
+            <button class="clear-btn" onclick="clearEmailFilter()">limpar todos</button>
+          </div>
+          <div class="input-row">
+            <input class="input-field" id="emailInput" type="text" placeholder="Digite um e-mail ou domínio, ex: @gmail.com" onkeydown="if(event.key==='Enter')addEmail()"/>
+            <button class="btn btn-ghost btn-sm" onclick="addEmail()">+ Adicionar</button>
+          </div>
+          <div class="email-chips" id="emailChips"></div>
+        </div>
+
+      </div><!-- /scroll -->
+
+      <!-- ACTION BAR -->
+      <div class="action-bar">
+        <div class="mode-pills">
+          <button class="mode-pill active" id="modeOnlyExcel" onclick="setMode('excel')">So CSV</button>
+          <button class="mode-pill" id="modeMesa" onclick="setMode('mesa')">CSV + Subir Mesa</button>
+          <button class="mode-pill" id="modeAuto" onclick="setMode('auto')">Tudo Automatico</button>
+        </div>
+        <div class="action-divider"></div>
+        <button class="btn btn-primary" id="btnGerar" onclick="executarFluxo()">
+          ⚡ Gerar Agora
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: MODO AUTO ══════════════════════════════════════════════════ -->
+    <div class="page" id="pg-limpeza">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Limpeza da Mesa</div>
+          <div class="page-sub">Consulta em tempo real, filtros, selecao e confirmacao antes de remover protocolos</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="consultarMesaLimpeza()">Atualizar mesa</button>
+        </div>
+      </div>
+
+      <div class="scroll">
+        <div class="stats-row">
+          <div class="stat-card blue">
+            <div class="stat-label">Na mesa</div>
+            <div class="stat-value" id="limpaTotalMesa">-</div>
+            <div class="stat-sub">conversas atuais</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-label">Apos filtros</div>
+            <div class="stat-value" id="limpaFiltrados">-</div>
+            <div class="stat-sub">visiveis na tabela</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-label">Selecionados</div>
+            <div class="stat-value" id="limpaSelecionados">-</div>
+            <div class="stat-sub">para limpeza</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-label">Removidos</div>
+            <div class="stat-value" id="limpaRemovidos">-</div>
+            <div class="stat-sub">ultima execucao</div>
+          </div>
+        </div>
+
+        <div class="cleanup-progress">
+          <div class="cleanup-progress-item">
+            <div class="cleanup-progress-label">Encontradas</div>
+            <div class="cleanup-progress-value" id="cleanProgTotal">-</div>
+          </div>
+          <div class="cleanup-progress-item">
+            <div class="cleanup-progress-label">Processadas</div>
+            <div class="cleanup-progress-value" id="cleanProgProcessed">-</div>
+          </div>
+          <div class="cleanup-progress-item">
+            <div class="cleanup-progress-label">Sucesso</div>
+            <div class="cleanup-progress-value" id="cleanProgSuccess">-</div>
+          </div>
+          <div class="cleanup-progress-item">
+            <div class="cleanup-progress-label">Erro</div>
+            <div class="cleanup-progress-value" id="cleanProgError">-</div>
+          </div>
+          <div class="cleanup-progress-item">
+            <div class="cleanup-progress-label">Pendentes</div>
+            <div class="cleanup-progress-value" id="cleanProgPending">-</div>
+          </div>
+          <div class="cleanup-progress-item">
+            <div class="cleanup-progress-label">Req/min</div>
+            <div class="cleanup-progress-value" id="cleanProgRate">-</div>
+          </div>
+        </div>
+        <div class="cleanup-progress-status" id="cleanupProgressStatus">
+          <span id="cleanProgStatus">Limpeza aguardando inicio.</span>
+          <span id="cleanProgCountdown"></span>
+        </div>
+
+        <div class="cleanup-grid">
+          <div class="cleanup-filter">
+            <div class="cfg-label">Busca</div>
+            <input class="input-field" id="limpaBusca" type="text" placeholder="Protocolo, tipo, skill..." oninput="aplicarFiltrosLimpeza()"/>
+          </div>
+          <div class="cleanup-filter">
+            <div class="cfg-label">Empresa / Estado</div>
+            <select class="input-field multi-select" id="limpaEmpresa" multiple onchange="aplicarFiltrosLimpeza()"></select>
+          </div>
+          <div class="cleanup-filter">
+            <div class="cfg-label">Prazo</div>
+            <select class="input-field multi-select" id="limpaPrazo" multiple onchange="aplicarFiltrosLimpeza()"></select>
+          </div>
+          <div class="cleanup-filter">
+            <div class="cfg-label">Status</div>
+            <select class="input-field multi-select" id="limpaStatus" multiple onchange="aplicarFiltrosLimpeza()"></select>
+          </div>
+          <div class="cleanup-filter">
+            <div class="cfg-label">Tipo de serviço</div>
+            <select class="input-field multi-select" id="limpaTipo" multiple onchange="aplicarFiltrosLimpeza()"></select>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="limparFiltrosLimpeza()">Limpar filtros</button>
+          <button class="btn btn-ghost btn-sm" onclick="selecionarFiltrados(true)">Selecionar filtrados</button>
+          <button class="btn btn-ghost btn-sm" onclick="selecionarFiltrados(false)">Limpar selecao</button>
+          <span style="font-size:10px;color:var(--text3);font-family:var(--mono)">A limpeza remove somente os itens selecionados na tabela.</span>
+        </div>
+
+        <div class="table-wrap">
+          <div style="max-height:380px;overflow:auto">
+            <table class="mesa-table">
+              <thead>
+                <tr>
+                  <th style="width:34px"></th>
+                  <th>Protocolo</th>
+                  <th>Tipo de servico</th>
+                  <th>Empresa</th>
+                  <th>Prazo</th>
+                  <th>Status</th>
+                  <th>Data</th>
+                  <th>Origem</th>
+                  <th>Skill</th>
+                  <th>Fila</th>
+                </tr>
+              </thead>
+              <tbody id="limpezaTableBody">
+                <tr><td colspan="10" class="muted">Abra a aba ou clique em Atualizar mesa para consultar o Genesys.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="danger-zone">
+          <div class="danger-copy">
+            <div class="danger-title">Limpeza real protegida</div>
+            <div class="danger-sub" id="limpaPreviewResumo">Selecione protocolos para ver o total e os estados que serao limpos.</div>
+          </div>
+          <button class="btn btn-danger" id="btnLimpezaReal" onclick="confirmarLimpezaReal()" disabled>Limpar selecionados</button>
+        </div>
+
+        <div class="cleanup-log" id="limpezaLog">
+          <div>Logs de consulta e limpeza aparecerao aqui.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="pg-extracoes">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Extrair Bases</div>
+          <div class="page-sub">Execute manualmente os scripts que baixam as bases usadas na geracao do CSV</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="saveExtractionConfig()">Salvar caminhos</button>
+          <button class="btn btn-primary btn-sm" id="btnRunAllExtracoes" onclick="runAllExtractions()">Rodar 4 scripts</button>
+        </div>
+      </div>
+
+      <div class="scroll">
+        <div class="extract-grid">
+          <div class="extract-card">
+            <div class="extract-head">
+              <div>
+                <div class="extract-title">Site Novo</div>
+                <div class="extract-runtime">Node.js</div>
+              </div>
+              <button class="btn btn-success btn-sm" id="btn-ext-siteNovo" onclick="runExtraction('siteNovo')">Rodar</button>
+            </div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="ext-siteNovo" type="text"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('ext-siteNovo',['js'])">Procurar</button>
+            </div>
+            <div class="extract-status" id="ext-status-siteNovo">Aguardando.</div>
+          </div>
+
+          <div class="extract-card">
+            <div class="extract-head">
+              <div>
+                <div class="extract-title">Site Antigo - BKO All</div>
+                <div class="extract-runtime">Node.js</div>
+              </div>
+              <button class="btn btn-success btn-sm" id="btn-ext-siteAntigo" onclick="runExtraction('siteAntigo')">Rodar</button>
+            </div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="ext-siteAntigo" type="text"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('ext-siteAntigo',['js'])">Procurar</button>
+            </div>
+            <div class="extract-status" id="ext-status-siteAntigo">Aguardando.</div>
+          </div>
+
+          <div class="extract-card">
+            <div class="extract-head">
+              <div>
+                <div class="extract-title">GO</div>
+                <div class="extract-runtime">Node.js</div>
+              </div>
+              <button class="btn btn-success btn-sm" id="btn-ext-go" onclick="runExtraction('go')">Rodar</button>
+            </div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="ext-go" type="text" placeholder="Selecione ou cole o caminho do go.js"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('ext-go',['js'])">Procurar</button>
+            </div>
+            <div class="extract-status" id="ext-status-go">Aguardando script Node.js.</div>
+          </div>
+
+          <div class="extract-card">
+            <div class="extract-head">
+              <div>
+                <div class="extract-title">RS / CEEE</div>
+                <div class="extract-runtime">Node.js</div>
+              </div>
+              <button class="btn btn-success btn-sm" id="btn-ext-rs" onclick="runExtraction('rs')">Rodar</button>
+            </div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="ext-rs" type="text" placeholder="Selecione ou cole o caminho do rs.js"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('ext-rs',['js'])">Procurar</button>
+            </div>
+            <div class="extract-status" id="ext-status-rs">Aguardando script Node.js.</div>
+          </div>
+        </div>
+
+        <div class="cleanup-log" id="extracaoLog">
+          <div>Logs das extracoes aparecerao aqui. Os scripts so rodam quando voce clicar.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="pg-auto">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Modo Automático</div>
+          <div class="page-sub">Configure o agendamento automatico de geracao de CSV</div>
+        </div>
+      </div>
+      <div class="scroll" style="padding:24px;display:flex;flex-direction:column;gap:16px;">
+
+        <div class="auto-row">
+          <div class="auto-info">
+            <div class="auto-title">Executar automaticamente</div>
+            <div class="auto-sub">Roda as 4 extracoes, valida sucesso, gera a base com os filtros atuais e pode executar o MesaDistribuicao.exe</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="autoToggle" onchange="onAutoToggle()"/>
+            <div class="toggle-slider"></div>
+          </label>
+        </div>
+
+        <div class="card" style="display:flex;align-items:center;gap:16px;">
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600">Intervalo entre execuções</div>
+            <div style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-top:2px">Cada ciclo completo respeita este intervalo</div>
+          </div>
+          <input class="num-input" type="number" id="autoInterval" min="5" max="1440" value="30"/>
+          <span style="font-size:11px;color:var(--text2);font-family:var(--mono)">min</span>
+        </div>
+
+        <div class="card" style="display:flex;align-items:center;gap:16px;">
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600">Subir na mesa automaticamente</div>
+            <div style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-top:2px">Executa o MesaDistribuicao.exe apos gerar o CSV filtrado</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="autoSubirToggle" checked/>
+            <div class="toggle-slider"></div>
+          </label>
+        </div>
+
+        <div class="card">
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px">Histórico de execuções automáticas</div>
+          <div id="autoHistory" style="font-family:var(--mono);font-size:11px;color:var(--text2);display:flex;flex-direction:column;gap:6px;">
+            <span style="color:var(--text3)">Nenhuma execução ainda.</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ PAGE: CONFIG ══════════════════════════════════════════════════════ -->
+    <div class="page" id="pg-config">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Configurações</div>
+          <div class="page-sub">Caminhos dos arquivos fonte e credenciais Genesys</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-success" onclick="saveConfig()">💾 Salvar</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="cfg-section-title">Interface</div>
+        <div class="auto-row" style="margin-bottom:12px">
+          <div class="auto-info">
+            <div class="auto-title">Modo claro</div>
+            <div class="auto-sub">Alterna a interface entre tema escuro e claro</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="cfg-theme-light" onchange="setTheme(this.checked ? 'light' : 'dark', true)"/>
+            <div class="toggle-slider"></div>
+          </label>
+        </div>
+        <div class="cfg-section-title">Arquivo de Priorização</div>
+
+        <div style="padding:0 0 12px">
+          <div class="cfg-label">PRIORIZAÇÃO_MESA_BKO.xlsx</div>
+          <div class="cfg-row">
+            <input class="cfg-path" id="cfg-prio" type="text" placeholder="Caminho para o arquivo..."/>
+            <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('cfg-prio',['xlsx'])">Procurar</button>
+          </div>
+        </div>
+
+        <div class="cfg-section-title" style="margin-top:8px">Bases CSV (Site Antigo)</div>
+        <div style="padding:0 0 12px;display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div class="cfg-label">EQTL_RS.csv</div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="cfg-rs" type="text"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('cfg-rs',['csv'])">Procurar</button>
+            </div>
+          </div>
+          <div>
+            <div class="cfg-label">EQTL_GO.csv</div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="cfg-go" type="text"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('cfg-go',['csv'])">Procurar</button>
+            </div>
+          </div>
+          <div>
+            <div class="cfg-label">bko_all.csv</div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="cfg-bkoall" type="text"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('cfg-bkoall',['csv'])">Procurar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cfg-section-title" style="margin-top:8px">Bases XLS — Site Novo (2 arquivos)</div>
+        <div style="padding:0 0 12px;display:flex;flex-direction:column;gap:10px">
+          <div id="xlsPathsContainer"></div>
+          <button class="btn btn-ghost btn-sm" style="align-self:flex-start;border-radius:8px" onclick="pickAllXls()">📂 Selecionar todos os XLS…</button>
+        </div>
+
+        <div class="cfg-section-title" style="margin-top:8px">Credenciais das Extrações</div>
+        <div class="credential-grid" style="padding:0 0 12px">
+          <div class="credential-card">
+            <div class="credential-title">Site Novo</div>
+            <div class="credential-fields">
+              <div>
+                <div class="cfg-label">Usuário</div>
+                <input class="cfg-path" id="cred-siteNovo-user" type="text" autocomplete="off"/>
+              </div>
+              <div>
+                <div class="cfg-label">Senha</div>
+                <input class="cfg-path" id="cred-siteNovo-pass" type="password" autocomplete="new-password" placeholder="Manter senha salva"/>
+              </div>
+            </div>
+          </div>
+          <div class="credential-card">
+            <div class="credential-title">Site Antigo</div>
+            <div class="credential-fields">
+              <div>
+                <div class="cfg-label">Usuário</div>
+                <input class="cfg-path" id="cred-siteAntigo-user" type="text" autocomplete="off"/>
+              </div>
+              <div>
+                <div class="cfg-label">Senha</div>
+                <input class="cfg-path" id="cred-siteAntigo-pass" type="password" autocomplete="new-password" placeholder="Manter senha salva"/>
+              </div>
+            </div>
+          </div>
+          <div class="credential-card">
+            <div class="credential-title">GO</div>
+            <div class="credential-fields">
+              <div>
+                <div class="cfg-label">Usuário</div>
+                <input class="cfg-path" id="cred-go-user" type="text" autocomplete="off"/>
+              </div>
+              <div>
+                <div class="cfg-label">Senha</div>
+                <input class="cfg-path" id="cred-go-pass" type="password" autocomplete="new-password" placeholder="Manter senha salva"/>
+              </div>
+            </div>
+          </div>
+          <div class="credential-card">
+            <div class="credential-title">RS / CEEE</div>
+            <div class="credential-fields">
+              <div>
+                <div class="cfg-label">Usuário</div>
+                <input class="cfg-path" id="cred-rs-user" type="text" autocomplete="off"/>
+              </div>
+              <div>
+                <div class="cfg-label">Senha</div>
+                <input class="cfg-path" id="cred-rs-pass" type="password" autocomplete="new-password" placeholder="Manter senha salva"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cfg-section-title" style="margin-top:8px">Genesys Cloud — Credenciais</div>
+        <div style="padding:0 0 12px;display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div class="cfg-label">ORG_REGION — chave do enum PureCloudRegionHosts</div>
+            <input class="cfg-path" id="cfg-region" type="text" placeholder="sa_east_1"/>
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:4px;line-height:1.7">
+              Valores válidos: <span style="color:var(--accent)">sa_east_1</span> (Brasil) · us_east_1 · eu_west_1 · ap_southeast_2 · ap_northeast_1
+            </div>
+          </div>
+          <div>
+            <div class="cfg-label">CLIENT_ID</div>
+            <input class="cfg-path" id="cfg-cid" type="text" placeholder="Client ID OAuth 2.0"/>
+          </div>
+          <div>
+            <div class="cfg-label">CLIENT_SECRET</div>
+            <input class="cfg-path" id="cfg-csecret" type="password" placeholder="Client Secret"/>
+          </div>
+          <div>
+            <div class="cfg-label">QUEUE_IDs (um por linha — fila(s) a monitorar)</div>
+            <textarea class="cfg-path" id="cfg-queues" rows="5" style="resize:vertical;font-size:11px;line-height:1.6" placeholder="4f25f041-e80d-4554-9a79-a358ad85d686&#10;16670797-0795-4ddb-b93d-b307e8efa5fa"></textarea>
+          </div>
+          <div>
+            <div class="cfg-label">IDs da mesa para limpeza por estado/sem filtro (um por linha)</div>
+            <textarea class="cfg-path" id="cfg-cleanup-queues" rows="8" style="resize:vertical;font-size:11px;line-height:1.6" placeholder="16670797-0795-4ddb-b93d-b307e8efa5fa&#10;4f25f041-e80d-4554-9a79-a358ad85d686"></textarea>
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:4px;line-height:1.7">
+              Usado somente quando a limpeza estiver sem filtros ou apenas com filtro de estado. Nessa situaÃ§Ã£o a consulta Ã© feita direto por ID da fila da mesa.
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-info">
+              <div class="auto-title">Velocidade da limpeza</div>
+              <div class="auto-sub">Paralelo controla conversas em processamento; req/min controla o limite global da Genesys</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+              <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">paralelo</span>
+              <input class="num-input" type="number" id="cfg-cleanup-concurrency" min="1" max="50" value="10"/>
+              <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">req/min</span>
+              <input class="num-input" type="number" id="cfg-cleanup-rate" min="1" max="300" value="280"/>
+              <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">429/s</span>
+              <input class="num-input" type="number" id="cfg-cleanup-fallback" min="1" max="300" value="30"/>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-info">
+              <div class="auto-title">Subida segura da mesa</div>
+              <div class="auto-sub">Ritmo continuo evita rajadas: ate N requisicoes em andamento, iniciando uma nova a cada intervalo</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+              <select class="input-field" id="cfg-upload-strategy" style="width:150px;flex:0 0 auto">
+                <option value="paced">Ritmo continuo</option>
+                <option value="batch">Lotes</option>
+                <option value="serial">Serial</option>
+              </select>
+              <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">workers</span>
+              <input class="num-input" type="number" id="cfg-upload-workers" min="1" max="5" value="5"/>
+              <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">intervalo/s</span>
+              <input class="num-input" type="number" id="cfg-upload-interval" min="0" max="300" step="0.1" value="2"/>
+              <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">timeout/min</span>
+              <input class="num-input" type="number" id="cfg-upload-timeout" min="0" max="720" value="0"/>
+            </div>
+          </div>
+
+          <!-- Status de teste -->
+          <div id="genesysTestResult" style="display:none;border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:11px;line-height:1.6"></div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" style="border-radius:20px" onclick="testGenesys()">🔌 Testar conexão agora</button>
+            <span style="font-size:10px;color:var(--text3);font-family:var(--mono);align-self:center">As credenciais também podem vir do arquivo .env na raiz do projeto</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────
+const S = {
+  mode: 'excel',   // 'excel' | 'mesa' | 'auto'
+  theme: 'dark',
+  filtros: {
+    estados: [], sla: [], skills: [], responsavel: [],
+    tiposServico: [], sites: [], emails: [],
+    excluirTiposServico: [
+      'Cadastro baixa renda',
+      'Cadastro de Comunicadores',
+      'Problemas com Login',
+      'Agência Web',
+    ]
+  },
+  lastResult: null,
+  lastOutputPath: null,
+  autoActive: false,
+  autoSecs: 0,
+  autoTimer: null,
+  flowRunning: false,
+  autoHistory: [],
+  limpeza: {
+    loaded: false,
+    records: [],
+    filtered: [],
+    selected: new Set(),
+    lastRemoved: 0,
+  },
+  extractionRunning: false,
+};
+
+// ─── Init ──────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  const cfg = await api.getConfig();
+  applyConfigToUI(cfg);
+  syncFilterTagsFromState();
+
+  // Escuta status do Genesys vindo do processo principal durante a geração
+  api.onGenesysStatus(({ ok, total, protocolos, region, msg }) => {
+    if (ok) {
+      setGenesysStatus(true, `Genesys OK · ${total} na fila · ${protocolos} protocolos na mesa`);
+    } else {
+      setGenesysStatus(false, 'Genesys: ' + (msg || 'erro'));
+    }
+  });
+
+  // Escuta auto trigger do main
+  api.onAutoTrigger(async () => {
+    appendAutoHistory('Auto-trigger recebido');
+    await executarFluxo(true);
+  });
+
+  // Escuta progresso
+  api.onProgress(({ step, msg }) => {
+    appendLog(step, msg);
+    const pct = Math.min(95, step * 23);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = msg;
+  });
+
+  api.onExtracaoLog(({ id, line, type }) => {
+    appendExtracaoLog(id, line, type);
+  });
+
+  if (api.onCleanupProgress) {
+    api.onCleanupProgress(updateCleanupProgress);
+  }
+});
+
+// ─── Navigation ────────────────────────────────────────────────────────────
+function goPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pg-' + id).classList.add('active');
+  document.getElementById('nav-' + id).classList.add('active');
+  if (id === 'limpeza' && !S.limpeza.loaded) consultarMesaLimpeza();
+}
+
+function setTheme(theme, persist = false) {
+  S.theme = theme === 'light' ? 'light' : 'dark';
+  document.body.dataset.theme = S.theme;
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = S.theme === 'light' ? 'Modo escuro' : 'Modo claro';
+  const cfgToggle = document.getElementById('cfg-theme-light');
+  if (cfgToggle) cfgToggle.checked = S.theme === 'light';
+  if (persist) {
+    api.setConfig({ UI_THEME: S.theme }).catch(() => toast('Nao foi possivel salvar o tema.', 'err'));
+  }
+}
+
+function toggleTheme() {
+  setTheme(S.theme === 'light' ? 'dark' : 'light', true);
+}
+
+// ─── Mode ──────────────────────────────────────────────────────────────────
+function setMode(m) {
+  S.mode = m;
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active','green'));
+  document.getElementById('modeOnlyExcel').classList.toggle('active', m === 'excel');
+  document.getElementById('modeMesa').classList.toggle('active', m === 'mesa');
+  document.getElementById('modeAuto').classList.toggle('active', m === 'auto');
+  if (m === 'auto') document.getElementById('modeAuto').classList.add('green');
+}
+
+// ─── Filter tags ───────────────────────────────────────────────────────────
+function toggleTag(el) {
+  const filter = el.dataset.filter;
+  const val    = el.dataset.val;
+  el.classList.toggle('sel');
+  const arr = S.filtros[filter];
+  const idx = arr.indexOf(val);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(val);
+}
+
+function clearFilter(name) {
+  S.filtros[name] = [];
+  document.querySelectorAll(`[data-filter="${name}"]`).forEach(t => t.classList.remove('sel'));
+}
+
+function selectFilterAll(name) {
+  const values = [...document.querySelectorAll(`[data-filter="${name}"]`)]
+    .map(t => t.dataset.val)
+    .filter(Boolean);
+  S.filtros[name] = [...new Set(values)];
+  syncFilterTagsFromState();
+}
+
+function syncFilterTagsFromState() {
+  document.querySelectorAll('[data-filter]').forEach(t => {
+    const arr = S.filtros[t.dataset.filter] || [];
+    t.classList.toggle('sel', arr.includes(t.dataset.val));
+  });
+}
+
+// ─── Email filter ──────────────────────────────────────────────────────────
+function addEmail() {
+  const inp = document.getElementById('emailInput');
+  const val = inp.value.trim();
+  if (!val || S.filtros.emails.includes(val)) { inp.value=''; return; }
+  S.filtros.emails.push(val);
+  renderEmailChips();
+  inp.value = '';
+}
+
+function removeEmail(val) {
+  S.filtros.emails = S.filtros.emails.filter(e => e !== val);
+  renderEmailChips();
+}
+
+function clearEmailFilter() {
+  S.filtros.emails = [];
+  renderEmailChips();
+}
+
+function renderEmailChips() {
+  const c = document.getElementById('emailChips');
+  c.innerHTML = S.filtros.emails.map(e =>
+    `<span class="email-chip">${esc(e)} <button onclick="removeEmail('${esc(e)}')">×</button></span>`
+  ).join('');
+}
+
+// ─── Dynamic filter tags ───────────────────────────────────────────────────
+function populateDynamicFilters(uniqueSkills, uniqueTipos) {
+  const skillsWrap = document.getElementById('f-skills');
+  skillsWrap.innerHTML = uniqueSkills.length
+    ? uniqueSkills.map(s => `<span class="tag" data-filter="skills" data-val="${esc(s)}" onclick="toggleTag(this)">${esc(s)}</span>`).join('')
+    : '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Nenhuma skill encontrada</span>';
+
+  const tipoWrap = document.getElementById('f-tiposServico');
+  tipoWrap.innerHTML = uniqueTipos.length
+    ? uniqueTipos.map(t => `<span class="tag" data-filter="tiposServico" data-val="${esc(t)}" onclick="toggleTag(this)">${esc(t)}</span>`).join('')
+    : '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Nenhum tipo encontrado</span>';
+  syncFilterTagsFromState();
+}
+
+// ─── Main flow ─────────────────────────────────────────────────────────────
+// Limpeza da Mesa
+function logLimpeza(msg) {
+  const el = document.getElementById('limpezaLog');
+  if (!el) return;
+  const line = document.createElement('div');
+  line.textContent = `${new Date().toLocaleString('pt-BR')} - ${msg}`;
+  el.prepend(line);
+}
+
+function updateCleanupProgress(data = {}) {
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+  set('cleanProgTotal', fmtN(data.total || 0));
+  set('cleanProgProcessed', fmtN(data.processed || 0));
+  set('cleanProgSuccess', fmtN(data.success || 0));
+  set('cleanProgError', fmtN(data.error || 0));
+  set('cleanProgPending', fmtN(data.pending || 0));
+  set('cleanProgRate', data.rateLimitPerMinute ? `${data.rateLimitPerMinute}/min` : '-');
+
+  const status = document.getElementById('cleanupProgressStatus');
+  if (status) status.classList.toggle('waiting', !!data.rateLimited);
+  set('cleanProgStatus', data.msg || 'Limpeza em andamento...');
+  set('cleanProgCountdown', data.rateLimited ? `retoma em ${fmtN(data.retryAfterSeconds || 0)}s` : (data.concurrency ? `paralelo ${data.concurrency}` : ''));
+}
+
+function resumoEstadosLimpeza(records) {
+  const porEstado = {};
+  records.forEach(r => {
+    const estado = r.empresa || 'Sem estado';
+    porEstado[estado] = (porEstado[estado] || 0) + 1;
+  });
+  return Object.entries(porEstado)
+    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+    .map(([estado, total]) => `${estado}: ${fmtN(total)}`)
+    .join(', ');
+}
+
+function cleanupSimpleQueueMode(f = cleanupFilters()) {
+  const hasBusca = !!String(f.busca || '').trim();
+  const hasPrazo = (f.prazo || []).length > 0;
+  const hasStatus = (f.status || []).length > 0;
+  const hasTipo = (f.tipoServico || []).length > 0;
+  return !hasBusca && !hasPrazo && !hasStatus && !hasTipo;
+}
+
+function cleanupQueueModeLabel(f = cleanupFilters()) {
+  return (f.empresa || []).length
+    ? `filtro de estado (${f.empresa.join(', ')})`
+    : 'sem filtros';
+}
+
+function updateLimpezaActionState() {
+  const records = selectedLimpezaRecords();
+  const f = cleanupFilters();
+  const queueMode = cleanupSimpleQueueMode(f);
+  const btn = document.getElementById('btnLimpezaReal');
+  if (btn) {
+    btn.disabled = !queueMode && !records.length;
+    btn.textContent = queueMode
+      ? 'Limpar por ID da mesa'
+      : (records.length ? `Limpar ${fmtN(records.length)} selecionado(s)` : 'Limpar selecionados');
+  }
+  const preview = document.getElementById('limpaPreviewResumo');
+  if (preview) {
+    if (queueMode) {
+      const approx = S.limpeza.loaded ? ` A tabela atual mostra ${fmtN(S.limpeza.filtered.length)} conversa(s), mas a limpeza vai consultar os IDs configurados na hora.` : '';
+      preview.textContent = `Modo por ID da mesa ativo (${cleanupQueueModeLabel(f)}). A selecao manual da tabela sera ignorada.${approx}`;
+    } else {
+      preview.textContent = records.length
+        ? `${fmtN(records.length)} protocolo(s) selecionado(s). Estados: ${resumoEstadosLimpeza(records)}.`
+        : 'Selecione protocolos para ver o total e os estados que serao limpos.';
+    }
+  }
+}
+
+function selectedLimpezaIds() {
+  return [...S.limpeza.selected];
+}
+
+function selectedValues(id) {
+  return [...(document.getElementById(id)?.selectedOptions || [])]
+    .map(o => o.value)
+    .filter(Boolean);
+}
+
+function cleanupFilters() {
+  return {
+    busca: document.getElementById('limpaBusca')?.value.trim() || '',
+    empresa: selectedValues('limpaEmpresa'),
+    prazo: selectedValues('limpaPrazo'),
+    status: selectedValues('limpaStatus'),
+    tipoServico: selectedValues('limpaTipo'),
+  };
+}
+
+function updateLimpezaCounters() {
+  document.getElementById('limpaTotalMesa').textContent = fmtN(S.limpeza.records.length);
+  document.getElementById('limpaFiltrados').textContent = fmtN(S.limpeza.filtered.length);
+  document.getElementById('limpaSelecionados').textContent = fmtN(S.limpeza.selected.size);
+  document.getElementById('limpaRemovidos').textContent = fmtN(S.limpeza.lastRemoved || 0);
+}
+
+function fillCleanupSelect(id, values, label) {
+  const sel = document.getElementById(id);
+  const current = new Set(selectedValues(id));
+  const opts = values.filter(Boolean).map(v => String(v));
+  sel.innerHTML = opts
+    .sort((a,b) => a.localeCompare(b, 'pt-BR'))
+    .map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  [...sel.options].forEach(opt => { opt.selected = current.has(opt.value); });
+  sel.title = `${label}. Sem selecao = todos.`;
+}
+
+function populateCleanupFilters(records) {
+  fillCleanupSelect('limpaEmpresa', [...new Set(records.map(r => r.empresa))], 'Todas empresas');
+  fillCleanupSelect('limpaPrazo', [...new Set(records.map(r => r.prazo))], 'Todos prazos');
+  fillCleanupSelect('limpaStatus', [...new Set(records.map(r => r.status))], 'Todos status');
+  fillCleanupSelect('limpaTipo', [...new Set(records.map(r => r.tipoServico))], 'Todos tipos');
+}
+
+async function consultarMesaLimpeza() {
+  updateLimpezaActionState();
+  setProcessStatus('run', 'Consultando mesa...');
+  logLimpeza('Consultando mesa via API Genesys.');
+
+  try {
+    const res = await api.listarMesa();
+    if (!res.ok) throw new Error(res.msg);
+    S.limpeza.loaded = true;
+    S.limpeza.records = res.records || [];
+    S.limpeza.selected = new Set();
+    populateCleanupFilters(S.limpeza.records);
+    aplicarFiltrosLimpeza(false);
+    updateLimpezaActionState();
+    updateCleanupProgress({
+      total: S.limpeza.records.length,
+      processed: 0,
+      success: 0,
+      error: 0,
+      pending: S.limpeza.records.length,
+      msg: 'Mesa atualizada. Aguardando limpeza.',
+    });
+    setGenesysStatus(true, `Genesys OK · ${fmtN(res.total)} na mesa`);
+    setProcessStatus('ok', `Mesa consultada: ${fmtN(res.total)} conversas`);
+    logLimpeza(`Consulta concluida: ${fmtN(res.total)} conversas, ${fmtN(res.totalProtocolos || 0)} protocolos identificados.`);
+  } catch(e) {
+    setProcessStatus('err', 'Erro ao consultar mesa');
+    logLimpeza(`Erro na consulta: ${e.message}`);
+    toast('Erro ao consultar mesa: ' + e.message, 'err');
+    updateCleanupProgress({ total: 0, processed: 0, success: 0, error: 1, pending: 0, status: 'error', msg: e.message });
+    renderMesaTable([]);
+  }
+}
+
+function aplicarFiltrosLimpeza(invalidate = true) {
+  if (invalidate) updateLimpezaActionState();
+  const f = cleanupFilters();
+  const q = f.busca.toLowerCase();
+  S.limpeza.filtered = S.limpeza.records.filter(r => {
+    const hay = [r.protocolo, r.tipoServico, r.empresa, r.prazo, r.status, r.data, r.origem, r.skill, r.queueName].join(' ').toLowerCase();
+    if (q && !hay.includes(q)) return false;
+    if (f.empresa.length && !f.empresa.includes(r.empresa || '')) return false;
+    if (f.prazo.length && !f.prazo.includes(r.prazo || '')) return false;
+    if (f.status.length && !f.status.includes(r.status || '')) return false;
+    if (f.tipoServico.length && !f.tipoServico.includes(r.tipoServico || '')) return false;
+    return true;
+  });
+  renderMesaTable(S.limpeza.filtered);
+  updateLimpezaCounters();
+  updateLimpezaActionState();
+}
+
+function limparFiltrosLimpeza() {
+  const busca = document.getElementById('limpaBusca');
+  if (busca) busca.value = '';
+  ['limpaEmpresa', 'limpaPrazo', 'limpaStatus', 'limpaTipo'].forEach(id => {
+    [...(document.getElementById(id)?.options || [])].forEach(opt => { opt.selected = false; });
+  });
+  aplicarFiltrosLimpeza();
+}
+
+function renderMesaTable(records) {
+  const tbody = document.getElementById('limpezaTableBody');
+  if (!records.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="muted">Nenhum registro encontrado para os filtros atuais.</td></tr>';
+    updateLimpezaCounters();
+    return;
+  }
+
+  tbody.innerHTML = records.map(r => {
+    const checked = S.limpeza.selected.has(r.conversationId) ? 'checked' : '';
+    return `<tr>
+      <td><input type="checkbox" data-conv="${esc(r.conversationId)}" onchange="toggleLimpezaSelection(this.dataset.conv, this.checked)" ${checked}/></td>
+      <td>${esc(r.protocolo || '-')}</td>
+      <td>${esc(r.tipoServico || '-')}</td>
+      <td>${esc(r.empresa || '-')}</td>
+      <td>${esc(r.prazo || '-')}</td>
+      <td>${esc(r.status || '-')}</td>
+      <td>${esc(r.data || '-')}</td>
+      <td>${esc(r.origem || '-')}</td>
+      <td>${esc(r.skill || '-')}</td>
+      <td>${esc(r.queueName || r.queueId || '-')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleLimpezaSelection(conversationId, checked) {
+  if (checked) S.limpeza.selected.add(conversationId);
+  else S.limpeza.selected.delete(conversationId);
+  updateLimpezaActionState();
+  updateLimpezaCounters();
+}
+
+function selecionarFiltrados(on) {
+  if (on) {
+    S.limpeza.filtered.forEach(r => S.limpeza.selected.add(r.conversationId));
+  } else {
+    S.limpeza.selected.clear();
+  }
+  updateLimpezaActionState();
+  renderMesaTable(S.limpeza.filtered);
+  updateLimpezaCounters();
+}
+
+function selectedLimpezaRecords() {
+  const ids = new Set(selectedLimpezaIds());
+  return S.limpeza.records.filter(r => ids.has(r.conversationId));
+}
+
+async function confirmarLimpezaReal() {
+  const filtros = cleanupFilters();
+  const queueMode = cleanupSimpleQueueMode(filtros);
+  let ids = selectedLimpezaIds();
+  let records = selectedLimpezaRecords();
+  let payloadBase = { dryRun: false, confirmText: 'LIMPAR', conversationIds: ids, records, filtros };
+  let confirmText = '';
+
+  if (queueMode) {
+    setProcessStatus('run', 'Consultando IDs da mesa para limpeza...');
+    logLimpeza(`Pre-consulta por ID da mesa iniciada (${cleanupQueueModeLabel(filtros)}).`);
+    const preview = await api.limparMesa({ dryRun: true, cleanupMode: 'queueIds', filtros });
+    if (!preview.ok) {
+      setProcessStatus('err', 'Falha na pre-consulta da limpeza');
+      toast(preview.msg || 'Falha ao consultar IDs da mesa.', 'err');
+      logLimpeza('Pre-consulta por ID da mesa falhou: ' + (preview.msg || '-'));
+      return;
+    }
+    const info = preview.queueModeInfo || {};
+    if (!preview.selecionados) {
+      toast('Nenhuma conversa encontrada nos IDs de fila configurados.', 'inf');
+      logLimpeza('Pre-consulta por ID da mesa retornou 0 conversas.');
+      setProcessStatus('ok', 'Nenhuma conversa encontrada para limpar');
+      return;
+    }
+    payloadBase = { dryRun: false, confirmText: 'LIMPAR', cleanupMode: 'queueIds', filtros };
+    confirmText =
+      `Modo por ID da mesa ativo (${cleanupQueueModeLabel(filtros)}).\n\n` +
+      `Conversas encontradas agora: ${fmtN(preview.selecionados)}\n` +
+      `Estados: ${(info.estados || []).join(', ') || '-'}\n` +
+      `Filas configuradas: ${(info.queueIds || []).join(', ') || '-'}\n\n` +
+      'A selecao manual da tabela sera ignorada.\n\n' +
+      'Confirma a limpeza dessas conversas?';
+  } else {
+    if (!ids.length) {
+      toast('Selecione ao menos um protocolo para limpar.', 'err');
+      logLimpeza('Limpeza nao iniciada: nenhum item selecionado.');
+      return;
+    }
+    const estados = resumoEstadosLimpeza(records);
+    confirmText =
+      `Voce vai limpar ${fmtN(records.length)} protocolo(s) da mesa.\n\n` +
+      `Estados: ${estados || '-'}\n\n` +
+      'Confirma a limpeza dos itens selecionados?';
+  }
+
+  const okConfirm = confirm(confirmText);
+  if (!okConfirm) {
+    toast('Limpeza cancelada.', 'inf');
+    return;
+  }
+
+  const btn = document.getElementById('btnLimpezaReal');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Limpando...';
+  }
+  try {
+    setProcessStatus('run', queueMode ? 'Executando limpeza por ID da mesa...' : 'Executando limpeza...');
+    const res = await api.limparMesa(payloadBase);
+    if (!res.ok) {
+      setProcessStatus('err', 'Falha na limpeza');
+      logLimpeza(`Limpeza falhou: ${res.msg}. Log: ${res.logPath || '-'}`);
+      toast(res.msg || 'Falha na limpeza.', 'err');
+      return;
+    }
+
+    S.limpeza.lastRemoved = res.removed || 0;
+    S.limpeza.selected.clear();
+    updateLimpezaActionState();
+    updateLimpezaCounters();
+    const resultResumo = `${fmtN(res.removed || 0)} removidos, ${fmtN(res.failures?.length || 0)} falhas, ${fmtN(res.ignored || 0)} ignorados.`;
+    document.getElementById('limpaPreviewResumo').textContent = resultResumo;
+    logLimpeza(`Limpeza real concluida: ${fmtN(res.removed || 0)} removidos, ${fmtN(res.failures?.length || 0)} falhas. Log: ${res.logPath || '-'}`);
+    setProcessStatus('ok', 'Limpeza concluida');
+    toast('Limpeza concluida. Atualizando mesa...', 'ok');
+    await consultarMesaLimpeza();
+    document.getElementById('limpaPreviewResumo').textContent = resultResumo;
+  } catch(e) {
+    setProcessStatus('err', 'Erro na limpeza');
+    logLimpeza('Erro inesperado na limpeza: ' + e.message);
+    toast('Erro na limpeza: ' + e.message, 'err');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      updateLimpezaActionState();
+    }
+  }
+}
+
+// Extracoes de bases
+const EXTRACTION_IDS = ['siteNovo', 'siteAntigo', 'go', 'rs'];
+const EXTRACTION_META = {
+  siteNovo: { label: 'Site Novo', runtime: 'node' },
+  siteAntigo: { label: 'Site Antigo - BKO All', runtime: 'node' },
+  go: { label: 'GO', runtime: 'node' },
+  rs: { label: 'RS / CEEE', runtime: 'node' },
+};
+
+function applyExtractionConfigToUI(scripts) {
+  EXTRACTION_IDS.forEach(id => {
+    const input = document.getElementById(`ext-${id}`);
+    if (input) input.value = scripts[id]?.path || '';
+  });
+}
+
+function getExtractionConfigFromUI() {
+  const scripts = {};
+  EXTRACTION_IDS.forEach(id => {
+    const current = EXTRACTION_META[id];
+    const p = document.getElementById(`ext-${id}`)?.value.trim() || '';
+    scripts[id] = {
+      label: current.label,
+      runtime: current.runtime,
+      path: p,
+      cwd: p ? p.replace(/[\\/][^\\/]+$/, '') : '',
+    };
+  });
+  return scripts;
+}
+
+async function saveExtractionConfig({ silent = false } = {}) {
+  await api.setConfig({ EXTRACTION_SCRIPTS: getExtractionConfigFromUI() });
+  if (!silent) toast('Caminhos de extracao salvos', 'ok');
+}
+
+function setExtractionButtons(disabled) {
+  S.extractionRunning = disabled;
+  EXTRACTION_IDS.forEach(id => {
+    const btn = document.getElementById(`btn-ext-${id}`);
+    if (btn) btn.disabled = disabled;
+  });
+  const all = document.getElementById('btnRunAllExtracoes');
+  if (all) all.disabled = disabled;
+}
+
+function setExtractionStatus(id, msg, type = 'info') {
+  const el = document.getElementById(`ext-status-${id}`);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = type === 'ok' ? 'var(--accent-g)' : type === 'err' ? 'var(--accent-r)' : 'var(--text2)';
+}
+
+function appendExtracaoLog(id, line, type = 'info') {
+  const el = document.getElementById('extracaoLog');
+  if (!el) return;
+  const meta = EXTRACTION_META[id]?.label || id;
+  const div = document.createElement('div');
+  div.textContent = `${new Date().toLocaleTimeString('pt-BR')} [${meta}] ${line}`;
+  div.style.color = type === 'err' ? 'var(--accent-r)' : type === 'ok' ? 'var(--accent-g)' : 'var(--text2)';
+  el.prepend(div);
+}
+
+async function runExtraction(id) {
+  await saveExtractionConfig();
+  setExtractionButtons(true);
+  setExtractionStatus(id, 'Rodando...', 'info');
+  setProcessStatus('run', `Extraindo ${EXTRACTION_META[id]?.label || id}...`);
+
+  try {
+    const res = await api.runExtracao({ ids: [id] });
+    const item = res.results?.[0];
+    if (res.ok && item?.ok) {
+      setExtractionStatus(id, `Concluido. Log: ${item.logPath || '-'}`, 'ok');
+      setProcessStatus('ok', 'Extracao concluida');
+      toast(`${EXTRACTION_META[id].label} concluido`, 'ok');
+    } else {
+      const msg = item?.msg || res.msg || 'Falha na extracao.';
+      setExtractionStatus(id, msg, 'err');
+      setProcessStatus('err', 'Falha na extracao');
+      toast(msg, 'err');
+    }
+  } finally {
+    setExtractionButtons(false);
+  }
+}
+
+async function executarExtracoesObrigatorias({ auto = false } = {}) {
+  await saveExtractionConfig({ silent: auto });
+  setExtractionButtons(true);
+  EXTRACTION_IDS.forEach(id => setExtractionStatus(id, 'Na fila...', 'info'));
+  setProcessStatus('run', auto ? 'Modo automatico: rodando extracoes...' : 'Rodando extracoes...');
+  if (auto) appendAutoHistory('Iniciando extracao das 4 bases');
+
+  try {
+    const res = await api.runExtracao({ ids: EXTRACTION_IDS });
+    for (const item of res.results || []) {
+      setExtractionStatus(item.id, item.ok ? `Concluido. Log: ${item.logPath || '-'}` : item.msg, item.ok ? 'ok' : 'err');
+    }
+    if (!res.ok) {
+      const falhas = (res.results || [])
+        .filter(item => !item.ok)
+        .map(item => `${EXTRACTION_META[item.id]?.label || item.id}: ${item.msg || 'falha'}`);
+      throw new Error(falhas.length ? falhas.join(' | ') : (res.msg || 'Falha em uma ou mais extracoes.'));
+    }
+    setProcessStatus('ok', res.msg || 'Extracoes finalizadas');
+    if (auto) appendAutoHistory('Extracoes concluidas; gerando base filtrada');
+    return res;
+  } finally {
+    setExtractionButtons(false);
+  }
+}
+
+async function runAllExtractions() {
+  try {
+    const res = await executarExtracoesObrigatorias();
+    toast(res.msg || 'Extracoes finalizadas', 'ok');
+  } catch(e) {
+    setProcessStatus('err', 'Falha nas extracoes');
+    toast(e.message, 'err');
+  }
+}
+
+async function executarFluxo(isAutoRun = false) {
+  if (S.flowRunning) {
+    if (isAutoRun) appendAutoHistory('Execucao ignorada: ainda existe um ciclo em andamento');
+    return;
+  }
+  S.flowRunning = true;
+  const btn = document.getElementById('btnGerar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Processando…';
+
+  showProgress(true);
+  hideResult();
+  setProcessStatus('run', isAutoRun || S.mode === 'auto' ? 'Preparando modo automatico...' : 'Gerando base…');
+
+  try {
+    if (isAutoRun || S.mode === 'auto') {
+      await executarExtracoesObrigatorias({ auto: true });
+      setProcessStatus('run', 'Gerando base com filtros atuais...');
+    }
+
+    // 1. Gerar base
+    const res = await api.gerarBase({ filtros: S.filtros });
+
+    if (!res.ok) throw new Error(res.msg);
+
+    S.lastResult     = res;
+    S.lastOutputPath = res.outputPath;
+
+    // Update stats
+    document.getElementById('stTotal').textContent  = fmtN(res.totalOriginal ?? res.total);
+    document.getElementById('stNovos').textContent  = fmtN(res.total);
+    document.getElementById('stPassivo').textContent = fmtN(res.stats?.porSLA?.Passivo || 0);
+    document.getElementById('stHoje').textContent   = fmtN(res.stats?.porSLA?.Hoje    || 0);
+    document.getElementById('sideLastTotal').textContent = fmtN(res.total);
+    document.getElementById('sideLastTime').textContent  = new Date().toLocaleString('pt-BR');
+    document.getElementById('lastRunLabel').textContent  = `Última: ${new Date().toLocaleTimeString('pt-BR')}`;
+
+    // Show result
+    showResult(res);
+
+    // Populate dynamic filters
+    populateDynamicFilters(res.uniqueSkills || [], res.uniqueTipos || []);
+
+    setProcessStatus('ok', `Base gerada: ${fmtN(res.total)} registros`);
+    appendAutoHistory(`Gerado: ${fmtN(res.totalOriginal ?? res.total)} original, ${fmtN(res.total)} final -> ${res.outputPath}`);
+
+    const deveSubir = isAutoRun
+      ? document.getElementById('autoSubirToggle').checked
+      : (S.mode === 'mesa' || S.mode === 'auto');
+
+    if (deveSubir && res.outputPath) {
+      setProcessStatus('run', 'Subindo na mesa…');
+      document.getElementById('progressLabel').textContent = 'Executando MesaDistribuicao.exe…';
+      document.getElementById('progressBar').style.width = '90%';
+
+      const mesaRes = await api.executarMesa(res.outputPath);
+
+      if (mesaRes.ok) {
+        document.getElementById('rs3').textContent = fmtN(res.total);
+        setProcessStatus('ok', 'Mesa atualizada com sucesso!');
+        appendLog(5, '✅ MesaDistribuicao.exe executado com sucesso.');
+        appendAutoHistory(`Mesa atualizada com ${fmtN(res.total)} registros`);
+        toast('✅ Base gerada e subida na mesa com sucesso!', 'ok');
+      } else {
+        setProcessStatus('warn', 'Erro ao executar Mesa');
+        appendLog(5, '⚠ ' + mesaRes.msg);
+        toast('CSV gerado, mas houve erro ao subir na mesa:\n' + mesaRes.msg, 'err');
+      }
+    } else {
+      toast(`CSV gerado: ${fmtN(res.total)} registros`, 'ok');
+    }
+
+    document.getElementById('progressBar').style.width = '100%';
+    setTimeout(() => showProgress(false), 1200);
+
+  } catch(e) {
+    setProcessStatus('err', 'Erro: ' + e.message);
+    appendLog('!', '❌ ' + e.message);
+    toast('❌ ' + e.message, 'err');
+    showProgress(false);
+  } finally {
+    S.flowRunning = false;
+    btn.disabled = false;
+    btn.innerHTML = '⚡ Gerar Agora';
+  }
+}
+
+// ─── Auto mode ─────────────────────────────────────────────────────────────
+async function onAutoToggle() {
+  const on = document.getElementById('autoToggle').checked;
+  const mins = parseInt(document.getElementById('autoInterval').value) || 30;
+
+  if (on) {
+    S.autoActive = true;
+    S.autoSecs   = mins * 60;
+    await api.startAuto(mins);
+    startCountdown(mins * 60);
+    document.getElementById('autoBadge').style.display = 'inline';
+    document.getElementById('autoActiveBar').classList.add('show');
+    toast('🔄 Modo automático ativado', 'inf');
+  } else {
+    S.autoActive = false;
+    if (S.autoTimer) clearInterval(S.autoTimer);
+    await api.stopAuto();
+    document.getElementById('autoBadge').style.display = 'none';
+    document.getElementById('autoActiveBar').classList.remove('show');
+    document.getElementById('autoCountdown').textContent = '';
+    document.getElementById('autoNextIn').textContent = '—';
+    toast('⏸ Modo automático desativado', 'inf');
+  }
+}
+
+function startCountdown(secs) {
+  if (S.autoTimer) clearInterval(S.autoTimer);
+  let s = secs;
+  const el  = document.getElementById('autoCountdown');
+  const ni  = document.getElementById('autoNextIn');
+  const fmt = sec => {
+    const m = Math.floor(sec/60), ss = sec%60;
+    return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  };
+  const update = () => {
+    const t = fmt(s);
+    el.textContent  = `Próxima em ${t}`;
+    ni.textContent  = t;
+    if (s <= 0) { s = secs; } else s--;
+  };
+  update();
+  S.autoTimer = setInterval(update, 1000);
+}
+
+function appendAutoHistory(msg) {
+  const h = document.getElementById('autoHistory');
+  const ts = new Date().toLocaleString('pt-BR');
+  const line = document.createElement('div');
+  line.style.cssText = 'display:flex;gap:8px;align-items:center';
+  line.innerHTML = `<span style="color:var(--text3)">${ts}</span><span>${msg}</span>`;
+  if (h.firstChild?.style?.color === 'var(--text3)') h.innerHTML = '';
+  h.insertBefore(line, h.firstChild);
+  if (h.children.length > 20) h.removeChild(h.lastChild);
+}
+
+// ─── Config ────────────────────────────────────────────────────────────────
+function applyExtractionCredentialsToUI(credentials = {}) {
+  EXTRACTION_IDS.forEach(id => {
+    const user = document.getElementById(`cred-${id}-user`);
+    const pass = document.getElementById(`cred-${id}-pass`);
+    if (user) user.value = credentials[id]?.username || '';
+    if (pass) pass.value = '';
+  });
+}
+
+function getExtractionCredentialsFromUI() {
+  const credentials = {};
+  EXTRACTION_IDS.forEach(id => {
+    credentials[id] = {
+      username: document.getElementById(`cred-${id}-user`)?.value.trim() || '',
+      password: document.getElementById(`cred-${id}-pass`)?.value || '',
+    };
+  });
+  return credentials;
+}
+
+function readNumberInput(id, fallback = 0) {
+  const raw = document.getElementById(id)?.value || '';
+  const value = Number(String(raw).replace(',', '.'));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function applyConfigToUI(cfg) {
+  setTheme(cfg.UI_THEME || 'dark', false);
+  document.getElementById('cfg-prio').value    = cfg.PATH_PRIORIZACAO  || '';
+  document.getElementById('cfg-rs').value      = cfg.PATH_EQTL_RS      || '';
+  document.getElementById('cfg-go').value      = cfg.PATH_EQTL_GO      || '';
+  document.getElementById('cfg-bkoall').value  = cfg.PATH_BKO_ALL      || '';
+  document.getElementById('cfg-region').value  = cfg.ORG_REGION        || 'sa_east_1';
+  document.getElementById('cfg-cid').value     = cfg.CLIENT_ID         || '';
+  document.getElementById('cfg-csecret').value = cfg.CLIENT_SECRET     || '';
+  document.getElementById('cfg-queues').value  = (cfg.QUEUE_IDS || []).join('\n');
+  document.getElementById('cfg-cleanup-queues').value = (cfg.CLEANUP_QUEUE_IDS || []).join('\n');
+  document.getElementById('cfg-cleanup-concurrency').value = cfg.CLEANUP_CONCURRENCY || 10;
+  document.getElementById('cfg-cleanup-rate').value = cfg.CLEANUP_RATE_LIMIT_PER_MINUTE || 280;
+  document.getElementById('cfg-cleanup-fallback').value = cfg.CLEANUP_RATE_LIMIT_FALLBACK_SECONDS || 30;
+  document.getElementById('cfg-upload-strategy').value = cfg.MESA_UPLOAD_STRATEGY || 'paced';
+  document.getElementById('cfg-upload-workers').value = cfg.MESA_UPLOAD_WORKERS || 5;
+  document.getElementById('cfg-upload-interval').value = cfg.MESA_UPLOAD_INTERVAL_SECONDS ?? 2;
+  document.getElementById('cfg-upload-timeout').value = cfg.MESA_UPLOAD_TIMEOUT_MINUTES ?? 0;
+  document.getElementById('autoInterval').value = cfg.AUTO_INTERVAL_MIN || 30;
+  applyExtractionConfigToUI(cfg.EXTRACTION_SCRIPTS || {});
+  applyExtractionCredentialsToUI(cfg.EXTRACTION_CREDENTIALS || {});
+
+  renderXlsPaths(cfg.PATHS_XLS || []);
+}
+
+function renderXlsPaths(paths) {
+  const c = document.getElementById('xlsPathsContainer');
+  c.innerHTML = '';
+  const labels = ['01_Todos_Aberto','02_Todos_Pendente'];
+  paths.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.innerHTML = `
+      <div class="cfg-label">${labels[i] || 'Arquivo ' + (i+1)}</div>
+      <div class="cfg-row">
+        <input class="cfg-path" id="cfg-xls-${i}" type="text" value="${esc(p)}"/>
+        <button class="btn btn-ghost btn-sm" onclick="pickCfgFile('cfg-xls-${i}',['xls','xlsx'])">Procurar</button>
+      </div>`;
+    c.appendChild(d);
+  });
+}
+
+async function pickAllXls() {
+  const paths = await api.pickFiles([{ name: 'Excel', extensions: ['xls','xlsx'] }]);
+  if (paths.length) renderXlsPaths(paths);
+}
+
+async function pickCfgFile(inputId, exts) {
+  const p = await api.pickFile([{ name: 'Arquivo', extensions: exts }]);
+  if (p) document.getElementById(inputId).value = p;
+}
+
+async function saveConfig() {
+  const xlsInputs = document.querySelectorAll('[id^="cfg-xls-"]');
+  const xlsPaths  = [...xlsInputs].map(i => i.value).filter(Boolean);
+  const queueIds  = document.getElementById('cfg-queues').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  const cleanupQueueIds = document.getElementById('cfg-cleanup-queues').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+
+  const cfg = {
+    PATH_PRIORIZACAO  : document.getElementById('cfg-prio').value,
+    PATH_EQTL_RS      : document.getElementById('cfg-rs').value,
+    PATH_EQTL_GO      : document.getElementById('cfg-go').value,
+    PATH_BKO_ALL      : document.getElementById('cfg-bkoall').value,
+    PATHS_XLS         : xlsPaths,
+    ORG_REGION        : document.getElementById('cfg-region').value || 'sa_east_1',
+    CLIENT_ID         : document.getElementById('cfg-cid').value,
+    CLIENT_SECRET     : document.getElementById('cfg-csecret').value,
+    QUEUE_IDS         : queueIds,
+    CLEANUP_QUEUE_IDS : cleanupQueueIds,
+    CLEANUP_CONCURRENCY: readNumberInput('cfg-cleanup-concurrency', 10),
+    CLEANUP_RATE_LIMIT_PER_MINUTE: readNumberInput('cfg-cleanup-rate', 280),
+    CLEANUP_RATE_LIMIT_FALLBACK_SECONDS: readNumberInput('cfg-cleanup-fallback', 30),
+    MESA_UPLOAD_STRATEGY: document.getElementById('cfg-upload-strategy').value || 'paced',
+    MESA_UPLOAD_WORKERS: readNumberInput('cfg-upload-workers', 5),
+    MESA_UPLOAD_INTERVAL_SECONDS: readNumberInput('cfg-upload-interval', 2),
+    MESA_UPLOAD_BATCH_PAUSE_SECONDS: readNumberInput('cfg-upload-interval', 2),
+    MESA_UPLOAD_TIMEOUT_MINUTES: readNumberInput('cfg-upload-timeout', 0),
+    AUTO_INTERVAL_MIN : parseInt(document.getElementById('autoInterval').value) || 30,
+    UI_THEME          : S.theme,
+    EXTRACTION_CREDENTIALS: getExtractionCredentialsFromUI(),
+  };
+  await api.setConfig(cfg);
+  toast('💾 Configurações salvas', 'ok');
+}
+
+async function testGenesys() {
+  const resultEl = document.getElementById('genesysTestResult');
+  resultEl.style.display = 'block';
+  resultEl.style.background = 'var(--accent)11';
+  resultEl.style.border = '1px solid var(--accent)33';
+  resultEl.style.color = 'var(--accent)';
+  resultEl.innerHTML = '<span class="spin" style="color:var(--accent)"></span>  Conectando ao Genesys Cloud…';
+
+  // Salva config atual antes de testar
+  await saveConfig();
+
+  const res = await api.testGenesys();
+
+  if (res.ok) {
+    resultEl.style.background = 'var(--accent-g)11';
+    resultEl.style.border = '1px solid var(--accent-g)44';
+    resultEl.style.color = 'var(--accent-g)';
+    resultEl.innerHTML = `✅ Conectado com sucesso!<br>ORG_REGION: <b>${res.region}</b><br>E-mails aguardando nas filas: <b>${res.total}</b>`;
+    setGenesysStatus(true, `Genesys OK · ${res.region} · ${res.total} na fila`);
+    toast(`✅ Genesys conectado! ${res.total} e-mail(s) aguardando.`, 'ok');
+  } else {
+    resultEl.style.background = 'var(--accent-r)11';
+    resultEl.style.border = '1px solid var(--accent-r)44';
+    resultEl.style.color = 'var(--accent-r)';
+    resultEl.innerHTML = `❌ Falha na conexão<br>ORG_REGION tentada: <b>${res.region}</b><br>Erro: ${esc(res.msg)}<br><br><span style="color:var(--accent-y)">💡 Verifique se ORG_REGION está como <b>sa_east_1</b> no campo acima e salve antes de testar.</span>`;
+    setGenesysStatus(false, 'Genesys: ' + res.msg);
+    toast('❌ Genesys: ' + res.msg, 'err');
+  }
+}
+
+// ─── UI helpers ─────────────────────────────────────────────────────────────
+function showProgress(show) {
+  document.getElementById('progressWrap').classList.toggle('show', show);
+  if (show) document.getElementById('progressLog').innerHTML = '';
+}
+
+function hideResult() {
+  document.getElementById('resultBlock').classList.remove('show');
+}
+
+function showResult(res) {
+  const rb = document.getElementById('resultBlock');
+  rb.classList.add('show');
+  document.getElementById('resultPath').textContent = res.outputPath;
+  document.getElementById('rs1').textContent = fmtN(res.totalOriginal ?? res.total);
+  document.getElementById('rs2').textContent = fmtN(res.duplicatasRemovidas || 0);
+  document.getElementById('rs3').textContent = fmtN(res.total);
+
+  // Bar chart por estado
+  const barEl = document.getElementById('barEstado');
+  const estados = res.stats?.porEstado || {};
+  const max = Math.max(...Object.values(estados), 1);
+  barEl.innerHTML = Object.entries(estados)
+    .sort((a,b) => b[1]-a[1])
+    .map(([k,v]) => `
+      <div class="bar-item">
+        <div class="bar-key">${esc(k)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100).toFixed(1)}%"></div></div>
+        <div class="bar-num">${fmtN(v)}</div>
+      </div>`).join('');
+
+  document.getElementById('btnOpenFolder').onclick = () => api.openOutput(res.outputPath);
+}
+
+function appendLog(step, msg) {
+  const log = document.getElementById('progressLog');
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-step">[${step}]</span><span>${esc(msg)}</span>`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function setGenesysStatus(ok, msg) {
+  const dot = document.getElementById('genesysDot');
+  dot.className = 'sb-dot ' + (ok ? 'ok' : 'err');
+  document.getElementById('genesysStatus').textContent = msg;
+}
+
+function setProcessStatus(type, msg) {
+  const dot = document.getElementById('processDot');
+  dot.className = 'sb-dot ' + type;
+  document.getElementById('processStatus').textContent = msg;
+}
+
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'show ' + type;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.className = '', 4000);
+}
+
+function fmtN(n) { return Number(n).toLocaleString('pt-BR'); }
+function esc(s)  { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

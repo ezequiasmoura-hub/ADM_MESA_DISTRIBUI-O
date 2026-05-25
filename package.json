@@ -1,0 +1,27 @@
+{
+  "name": "mesa-distribuicao-bko",
+  "version": "2.0.0",
+  "description": "Mesa de Distribuicao - Painel Backoffice",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "check": "node --check main.js && node --check preload.js && node --check scripts/extracao/shared.js && node --check scripts/extracao/site-novo.js && node --check scripts/extracao/site-antigo.js && node --check scripts/extracao/go.js && node --check scripts/extracao/rs.js",
+    "extract:site-novo": "node scripts/extracao/site-novo.js",
+    "extract:site-antigo": "node scripts/extracao/site-antigo.js",
+    "extract:go": "node scripts/extracao/go.js",
+    "extract:rs": "node scripts/extracao/rs.js",
+    "extract:all": "node scripts/extracao/site-novo.js && node scripts/extracao/site-antigo.js && node scripts/extracao/go.js && node scripts/extracao/rs.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "dotenv": "^16.4.5",
+    "fs-extra": "^11.3.3",
+    "playwright": "^1.58.0",
+    "purecloud-platform-client-v2": "^227.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

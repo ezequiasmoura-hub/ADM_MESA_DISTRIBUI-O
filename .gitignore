@@ -1,0 +1,63 @@
+# Dependencias
+node_modules/
+extracao/**/node_modules/
+legacy/**/node_modules/
+
+# Builds e pacotes
+dist/
+build/
+out/
+release/
+*.exe
+*.msi
+*.zip
+*.7z
+
+# Ambiente e credenciais
+.env
+.env.*
+!.env.example
+inputMesa/.env
+legacy/**/.env
+legacy/**/.env.*
+
+# Logs
+logs/
+*.log
+inputMesa/*.log
+inputMesa/logs_*.txt
+
+# Dados gerados/operacionais
+inputMesa/*.csv
+inputMesa/*.xlsx
+inputMesa/*.xls
+inputMesa/historico/
+*.tmp
+*.bak
+
+# Artefatos sensiveis locais da subida
+inputMesa/MesaDistribuicao.py
+inputMesa/MesaDistribuicao.exe
+
+# Python/cache
+__pycache__/
+*.pyc
+inputMesa/__pycache__/
+
+# Cache e temporarios
+.analysis/
+.cache/
+tmp/
+temp/
+*.swp
+*.swo
+
+# Legado externo pesado/sensivel
+/extracao/
+legacy/**/.git/
+
+# Sistema/editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
