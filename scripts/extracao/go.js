@@ -7,6 +7,10 @@ const URL_BASE = 'https://backoffice-go.equatorialenergia.com.br';
 const OUTPUT_FILE = path.join(BASE_DIR, 'EQTL_GO.csv');
 const CONCORRENCIA_HTTP = Number(process.env.EXTRACAO_GO_CONCORRENCIA) || 100;
 
+function cleanText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
 function parseRows(html) {
   const $ = cheerio.load(html);
   const tbody = $('tbody.divide-y.divide-gray-200').first();
@@ -19,15 +23,15 @@ function parseRows(html) {
 
     let email = '';
     const emailEl = $(tds[4]).find('[title]').first();
-    email = emailEl.length ? emailEl.attr('title').trim() : $(tds[4]).text().trim();
+    email = emailEl.length ? cleanText(emailEl.attr('title')) : cleanText($(tds[4]).text());
 
     rows.push({
-      data_abertura: $(tds[0]).text().trim(),
-      protocolo: $(tds[1]).text().trim(),
-      tipo_servico: $(tds[2]).text().trim(),
-      conta_contrato: $(tds[3]).text().trim(),
+      data_abertura: cleanText($(tds[0]).text()),
+      protocolo: cleanText($(tds[1]).text()),
+      tipo_servico: cleanText($(tds[2]).text()),
+      conta_contrato: cleanText($(tds[3]).text()),
       email,
-      status: tds.length > 5 ? $(tds[5]).text().trim() : '',
+      status: tds.length > 5 ? cleanText($(tds[5]).text()) : '',
     });
   });
   return rows;

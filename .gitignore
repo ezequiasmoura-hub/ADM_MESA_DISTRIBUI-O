@@ -12,6 +12,10 @@ release/
 *.msi
 *.zip
 *.7z
+*.blockmap
+*.nupkg
+builder-debug.yml
+builder-effective-config.yaml
 
 # Ambiente e credenciais
 .env
@@ -47,6 +51,8 @@ inputMesa/__pycache__/
 # Cache e temporarios
 .analysis/
 .cache/
+playwright-report/
+test-results/
 tmp/
 temp/
 *.swp

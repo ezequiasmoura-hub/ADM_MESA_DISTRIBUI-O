@@ -180,7 +180,14 @@ body {
 }
 .nav-btn:hover { background: var(--card); color: var(--text); }
 .nav-btn.active { background: var(--accent)18; color: var(--accent); }
-.nav-btn .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-btn .nav-icon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 .nav-badge {
   margin-left: auto;
   background: var(--accent)22;
@@ -247,6 +254,20 @@ body {
 .btn:disabled { opacity: .35; cursor: not-allowed; }
 .btn-sm { padding: 6px 14px; font-size: 11px; }
 .btn-icon { padding: 8px; }
+.icon {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: -2px;
+}
+.icon-sm { width: 14px; height: 14px; }
+.btn .icon { margin-left: -1px; }
 
 /* ── TOGGLE SWITCH ───────────────────────────────────────────────────────── */
 .toggle-wrap { display: flex; align-items: center; gap: 10px; }
@@ -315,6 +336,51 @@ body {
 .stat-card.amber .stat-value { color: var(--accent-y); }
 
 /* ── Filter grid ── */
+.state-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 10px;
+}
+.state-summary-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+.state-summary-card.has-count { border-color: var(--accent)44; }
+.state-summary-label {
+  font-size: 9px;
+  color: var(--text2);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.state-summary-value {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--accent);
+}
+.state-summary-sub {
+  font-size: 9px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+.state-summary-empty {
+  grid-column: 1 / -1;
+  border: 1px dashed var(--border2);
+  border-radius: var(--r-sm);
+  color: var(--text3);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 12px 14px;
+}
+
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -326,6 +392,14 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--r);
   padding: 14px;
+  position: relative;
+  transition: border-color .18s ease, box-shadow .18s ease;
+  z-index: 1;
+}
+.filter-card:hover {
+  border-color: var(--accent)66;
+  box-shadow: 0 14px 40px #00000026;
+  z-index: 20;
 }
 .filter-card-header {
   display: flex;
@@ -341,7 +415,6 @@ body {
   align-items: center;
   gap: 6px;
 }
-.filter-card-title span { font-size: 14px; }
 .clear-btn {
   font-size: 10px;
   font-family: var(--mono);
@@ -366,10 +439,13 @@ body {
   flex-wrap: wrap;
   gap: 5px;
   max-height: 90px;
-  overflow-y: auto;
+  overflow: hidden;
+  transition: max-height .22s ease;
 }
-.tags-wrap::-webkit-scrollbar { width: 3px; }
-.tags-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.filter-card:hover .tags-wrap {
+  max-height: 1000px;
+  overflow: visible;
+}
 
 .tag {
   padding: 4px 11px;
@@ -620,7 +696,16 @@ body {
   align-items: center;
   gap: 10px;
 }
-.result-icon { font-size: 22px; }
+.result-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-g)18;
+  color: var(--accent-g);
+}
 .result-title { font-size: 15px; font-weight: 700; }
 .result-path { font-size: 10px; font-family: var(--mono); color: var(--text2); }
 
@@ -868,6 +953,25 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
 </head>
 <body>
 
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></symbol>
+  <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12A9 9 0 0 1 18.5 5.8"/><path d="M18 2v4h4"/><path d="M6 22v-4H2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1-2 3.4-.2-.1a1.8 1.8 0 0 0-2.1.3 1.8 1.8 0 0 0-.5 1.8V23H9v-.5a1.8 1.8 0 0 0-.5-1.8 1.8 1.8 0 0 0-2.1-.3l-.2.1-2-3.4.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.5-1.2H3v-4h.2a1.8 1.8 0 0 0 1.5-1.2 1.8 1.8 0 0 0-.4-2l-.1-.1 2-3.4.2.1a1.8 1.8 0 0 0 2.1-.3A1.8 1.8 0 0 0 9 1.5V1h6v.5a1.8 1.8 0 0 0 .5 1.8 1.8 1.8 0 0 0 2.1.3l.2-.1 2 3.4-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.5 1.2h.2v4h-.2A1.8 1.8 0 0 0 19.4 15z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"/><path d="M9 3v15"/><path d="M15 6v15"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="i-tool" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 4.9 4.9L10 20.8 5.2 16 14.7 6.3z"/><path d="m5.2 16-2 2 2.8 2.8 2-2"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3"/><path d="M8 21v-7h8v7"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M8 2v6"/><path d="M16 2v6"/><path d="M6 8h12v4a6 6 0 0 1-12 0V8z"/><path d="M12 18v4"/></symbol>
+</svg>
+
 <!-- TITLEBAR -->
 <div id="titlebar">
   <div class="tb-logo">MD</div>
@@ -906,22 +1010,22 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
   <nav id="sidebar">
     <div class="nav-section">Principal</div>
     <button class="nav-btn active" onclick="goPage('gerar')" id="nav-gerar">
-      <span class="nav-icon">⚡</span> Gerar Base
+      <span class="nav-icon"><svg class="icon"><use href="#i-zap"></use></svg></span> Gerar Base
     </button>
     <button class="nav-btn" onclick="goPage('limpeza')" id="nav-limpeza">
-      <span class="nav-icon">L</span> Limpeza da Mesa
+      <span class="nav-icon"><svg class="icon"><use href="#i-trash"></use></svg></span> Limpeza da Mesa
     </button>
     <button class="nav-btn" onclick="goPage('extracoes')" id="nav-extracoes">
-      <span class="nav-icon">B</span> Extrair Bases
+      <span class="nav-icon"><svg class="icon"><use href="#i-database"></use></svg></span> Extrair Bases
     </button>
     <button class="nav-btn" onclick="goPage('auto')" id="nav-auto">
-      <span class="nav-icon">🔄</span> Modo Automático
+      <span class="nav-icon"><svg class="icon"><use href="#i-refresh"></use></svg></span> Modo Automático
       <span class="nav-badge" id="autoBadge" style="display:none">ON</span>
     </button>
 
     <div class="nav-section">Sistema</div>
     <button class="nav-btn" onclick="goPage('config')" id="nav-config">
-      <span class="nav-icon">⚙️</span> Configurações
+      <span class="nav-icon"><svg class="icon"><use href="#i-settings"></use></svg></span> Configurações
     </button>
 
     <!-- Mini stats -->
@@ -978,6 +1082,10 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           </div>
         </div>
 
+        <div class="state-summary-grid" id="stateSummaryCards">
+          <div class="state-summary-empty">Gere a base para ver quantos protocolos vao para cada estado.</div>
+        </div>
+
         <!-- Progress -->
         <div class="progress-wrap" id="progressWrap">
           <div style="display:flex;align-items:center;gap:10px">
@@ -991,13 +1099,13 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
         <!-- Result block -->
         <div class="result-block" id="resultBlock">
           <div class="result-header">
-            <div class="result-icon">✅</div>
+            <div class="result-icon"><svg class="icon"><use href="#i-check"></use></svg></div>
             <div>
               <div class="result-title" id="resultTitle">Base gerada com sucesso</div>
               <div class="result-path" id="resultPath"></div>
             </div>
             <div style="margin-left:auto;display:flex;gap:8px">
-              <button class="btn btn-ghost btn-sm" id="btnOpenFolder">📂 Abrir pasta</button>
+              <button class="btn btn-ghost btn-sm" id="btnOpenFolder"><svg class="icon icon-sm"><use href="#i-folder"></use></svg> Abrir pasta</button>
             </div>
           </div>
           <div class="result-grid">
@@ -1028,7 +1136,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           <!-- Estado -->
           <div class="filter-card">
             <div class="filter-card-header">
-              <div class="filter-card-title"><span>🗺</span> Estado / Região</div>
+              <div class="filter-card-title"><svg class="icon icon-sm"><use href="#i-map"></use></svg> Estado / Região</div>
               <div class="filter-actions">
                 <button class="clear-btn" onclick="selectFilterAll('estados')">todos</button>
                 <button class="clear-btn" onclick="clearFilter('estados')">limpar</button>
@@ -1049,23 +1157,23 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           <!-- SLA -->
           <div class="filter-card">
             <div class="filter-card-header">
-              <div class="filter-card-title"><span>⏱</span> SLA / Prazo</div>
+              <div class="filter-card-title"><svg class="icon icon-sm"><use href="#i-clock"></use></svg> SLA / Prazo</div>
               <div class="filter-actions">
                 <button class="clear-btn" onclick="selectFilterAll('sla')">todos</button>
                 <button class="clear-btn" onclick="clearFilter('sla')">limpar</button>
               </div>
             </div>
             <div class="tags-wrap" id="f-sla">
-              <span class="tag" data-filter="sla" data-val="passivo" data-sla="passivo" onclick="toggleTag(this)">⚠ Passivo (vencido)</span>
-              <span class="tag" data-filter="sla" data-val="hoje"    data-sla="hoje"    onclick="toggleTag(this)">🔥 Vence Hoje</span>
-              <span class="tag" data-filter="sla" data-val="amanha"  data-sla="amanha"  onclick="toggleTag(this)">📅 No prazo (D+)</span>
+              <span class="tag" data-filter="sla" data-val="passivo" data-sla="passivo" onclick="toggleTag(this)">Passivo (vencido)</span>
+              <span class="tag" data-filter="sla" data-val="hoje"    data-sla="hoje"    onclick="toggleTag(this)">Vence Hoje</span>
+              <span class="tag" data-filter="sla" data-val="amanha"  data-sla="amanha"  onclick="toggleTag(this)">No prazo (D+)</span>
             </div>
           </div>
 
           <!-- Responsável -->
           <div class="filter-card">
             <div class="filter-card-header">
-              <div class="filter-card-title"><span>👤</span> Responsável</div>
+              <div class="filter-card-title"><svg class="icon icon-sm"><use href="#i-user"></use></svg> Responsável</div>
               <div class="filter-actions">
                 <button class="clear-btn" onclick="selectFilterAll('responsavel')">todos</button>
                 <button class="clear-btn" onclick="clearFilter('responsavel')">limpar</button>
@@ -1080,22 +1188,22 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           <!-- Site -->
           <div class="filter-card">
             <div class="filter-card-header">
-              <div class="filter-card-title"><span>🌐</span> Origem / Site</div>
+              <div class="filter-card-title"><svg class="icon icon-sm"><use href="#i-globe"></use></svg> Origem / Site</div>
               <div class="filter-actions">
                 <button class="clear-btn" onclick="selectFilterAll('sites')">todos</button>
                 <button class="clear-btn" onclick="clearFilter('sites')">limpar</button>
               </div>
             </div>
             <div class="tags-wrap" id="f-sites">
-              <span class="tag" data-filter="sites" data-val="novo"    onclick="toggleTag(this)">✨ Site Novo</span>
-              <span class="tag" data-filter="sites" data-val="antigo"  onclick="toggleTag(this)">📋 Site Antigo</span>
+              <span class="tag" data-filter="sites" data-val="novo"    onclick="toggleTag(this)">Site Novo</span>
+              <span class="tag" data-filter="sites" data-val="antigo"  onclick="toggleTag(this)">Site Antigo</span>
             </div>
           </div>
 
           <!-- Skill (dinâmico) -->
           <div class="filter-card">
             <div class="filter-card-header">
-              <div class="filter-card-title"><span>🎯</span> Skill</div>
+              <div class="filter-card-title"><svg class="icon icon-sm"><use href="#i-target"></use></svg> Skill</div>
               <div class="filter-actions">
                 <button class="clear-btn" onclick="selectFilterAll('skills')">todos</button>
                 <button class="clear-btn" onclick="clearFilter('skills')">limpar</button>
@@ -1109,7 +1217,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           <!-- Tipo de serviço (dinâmico) -->
           <div class="filter-card">
             <div class="filter-card-header">
-              <div class="filter-card-title"><span>🔧</span> Tipo de Serviço</div>
+              <div class="filter-card-title"><svg class="icon icon-sm"><use href="#i-tool"></use></svg> Tipo de Serviço</div>
               <div class="filter-actions">
                 <button class="clear-btn" onclick="selectFilterAll('tiposServico')">todos</button>
                 <button class="clear-btn" onclick="clearFilter('tiposServico')">limpar</button>
@@ -1125,7 +1233,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
         <!-- Email filter (full width) -->
         <div class="filter-card" style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;">
           <div class="filter-card-header">
-            <div class="filter-card-title"><span>📧</span> E-mail do cliente</div>
+            <div class="filter-card-title"><svg class="icon icon-sm"><use href="#i-mail"></use></svg> E-mail do cliente</div>
             <button class="clear-btn" onclick="clearEmailFilter()">limpar todos</button>
           </div>
           <div class="input-row">
@@ -1146,7 +1254,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
         </div>
         <div class="action-divider"></div>
         <button class="btn btn-primary" id="btnGerar" onclick="executarFluxo()">
-          ⚡ Gerar Agora
+          <svg class="icon icon-sm"><use href="#i-zap"></use></svg> Gerar Agora
         </button>
       </div>
     </div>
@@ -1425,7 +1533,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           <div class="page-sub">Caminhos dos arquivos fonte e credenciais Genesys</div>
         </div>
         <div class="page-actions">
-          <button class="btn btn-success" onclick="saveConfig()">💾 Salvar</button>
+          <button class="btn btn-success" onclick="saveConfig()"><svg class="icon icon-sm"><use href="#i-save"></use></svg> Salvar</button>
         </div>
       </div>
       <div class="scroll">
@@ -1478,7 +1586,27 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
         <div class="cfg-section-title" style="margin-top:8px">Bases XLS — Site Novo (2 arquivos)</div>
         <div style="padding:0 0 12px;display:flex;flex-direction:column;gap:10px">
           <div id="xlsPathsContainer"></div>
-          <button class="btn btn-ghost btn-sm" style="align-self:flex-start;border-radius:8px" onclick="pickAllXls()">📂 Selecionar todos os XLS…</button>
+          <button class="btn btn-ghost btn-sm" style="align-self:flex-start;border-radius:8px" onclick="pickAllXls()"><svg class="icon icon-sm"><use href="#i-folder"></use></svg> Selecionar todos os XLS...</button>
+        </div>
+
+        <div class="cfg-section-title" style="margin-top:8px">Pastas locais do aplicativo</div>
+        <div style="padding:0 0 12px;display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div class="cfg-label">Pasta inputMesa / CSV / executor externo</div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="cfg-input-mesa-dir" type="text" placeholder="Padrao automatico do aplicativo"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFolder('cfg-input-mesa-dir')">Procurar</button>
+            </div>
+            <div class="cfg-label" id="cfg-input-mesa-effective" style="margin-top:4px"></div>
+          </div>
+          <div>
+            <div class="cfg-label">Pasta de logs</div>
+            <div class="cfg-row">
+              <input class="cfg-path" id="cfg-log-dir" type="text" placeholder="Padrao automatico do aplicativo"/>
+              <button class="btn btn-ghost btn-sm" onclick="pickCfgFolder('cfg-log-dir')">Procurar</button>
+            </div>
+            <div class="cfg-label" id="cfg-log-effective" style="margin-top:4px"></div>
+          </div>
         </div>
 
         <div class="cfg-section-title" style="margin-top:8px">Credenciais das Extrações</div>
@@ -1603,7 +1731,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           <div id="genesysTestResult" style="display:none;border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:11px;line-height:1.6"></div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-ghost btn-sm" style="border-radius:20px" onclick="testGenesys()">🔌 Testar conexão agora</button>
+            <button class="btn btn-ghost btn-sm" style="border-radius:20px" onclick="testGenesys()"><svg class="icon icon-sm"><use href="#i-plug"></use></svg> Testar conexao agora</button>
             <span style="font-size:10px;color:var(--text3);font-family:var(--mono);align-self:center">As credenciais também podem vir do arquivo .env na raiz do projeto</span>
           </div>
         </div>
@@ -1645,7 +1773,7 @@ const S = {
     selected: new Set(),
     lastRemoved: 0,
   },
-  extractionRunning: false,
+  runningExtractions: new Set(),
 };
 
 // ─── Init ──────────────────────────────────────────────────────────────────
@@ -2150,14 +2278,28 @@ async function saveExtractionConfig({ silent = false } = {}) {
   if (!silent) toast('Caminhos de extracao salvos', 'ok');
 }
 
-function setExtractionButtons(disabled) {
-  S.extractionRunning = disabled;
+function setExtractionButtons() {
   EXTRACTION_IDS.forEach(id => {
     const btn = document.getElementById(`btn-ext-${id}`);
-    if (btn) btn.disabled = disabled;
+    if (!btn) return;
+    const running = S.runningExtractions.has(id);
+    btn.disabled = running;
+    btn.textContent = running ? 'Rodando...' : 'Rodar';
   });
   const all = document.getElementById('btnRunAllExtracoes');
-  if (all) all.disabled = disabled;
+  if (all) {
+    const allRunning = EXTRACTION_IDS.every(id => S.runningExtractions.has(id));
+    all.disabled = allRunning;
+    all.textContent = allRunning ? 'Rodando 4 scripts...' : 'Rodar 4 scripts';
+  }
+}
+
+function markExtractionsRunning(ids, running) {
+  ids.forEach(id => {
+    if (running) S.runningExtractions.add(id);
+    else S.runningExtractions.delete(id);
+  });
+  setExtractionButtons();
 }
 
 function setExtractionStatus(id, msg, type = 'info') {
@@ -2179,7 +2321,11 @@ function appendExtracaoLog(id, line, type = 'info') {
 
 async function runExtraction(id) {
   await saveExtractionConfig();
-  setExtractionButtons(true);
+  if (S.runningExtractions.has(id)) {
+    toast(`${EXTRACTION_META[id]?.label || id} ja esta em execucao`, 'inf');
+    return;
+  }
+  markExtractionsRunning([id], true);
   setExtractionStatus(id, 'Rodando...', 'info');
   setProcessStatus('run', `Extraindo ${EXTRACTION_META[id]?.label || id}...`);
 
@@ -2197,19 +2343,27 @@ async function runExtraction(id) {
       toast(msg, 'err');
     }
   } finally {
-    setExtractionButtons(false);
+    markExtractionsRunning([id], false);
   }
 }
 
 async function executarExtracoesObrigatorias({ auto = false } = {}) {
   await saveExtractionConfig({ silent: auto });
-  setExtractionButtons(true);
-  EXTRACTION_IDS.forEach(id => setExtractionStatus(id, 'Na fila...', 'info'));
+  const requestIds = auto
+    ? EXTRACTION_IDS
+    : EXTRACTION_IDS.filter(id => !S.runningExtractions.has(id));
+  if (!requestIds.length) throw new Error('As 4 extracoes ja estao em andamento.');
+  const localIds = requestIds.filter(id => !S.runningExtractions.has(id));
+  markExtractionsRunning(localIds, true);
+  EXTRACTION_IDS.forEach(id => {
+    const msg = S.runningExtractions.has(id) && !localIds.includes(id) ? 'Ja em execucao...' : (requestIds.includes(id) ? 'Na fila...' : 'Aguardando.');
+    setExtractionStatus(id, msg, 'info');
+  });
   setProcessStatus('run', auto ? 'Modo automatico: rodando extracoes...' : 'Rodando extracoes...');
   if (auto) appendAutoHistory('Iniciando extracao das 4 bases');
 
   try {
-    const res = await api.runExtracao({ ids: EXTRACTION_IDS });
+    const res = await api.runExtracao({ ids: requestIds });
     for (const item of res.results || []) {
       setExtractionStatus(item.id, item.ok ? `Concluido. Log: ${item.logPath || '-'}` : item.msg, item.ok ? 'ok' : 'err');
     }
@@ -2223,7 +2377,7 @@ async function executarExtracoesObrigatorias({ auto = false } = {}) {
     if (auto) appendAutoHistory('Extracoes concluidas; gerando base filtrada');
     return res;
   } finally {
-    setExtractionButtons(false);
+    markExtractionsRunning(localIds, false);
   }
 }
 
@@ -2297,12 +2451,12 @@ async function executarFluxo(isAutoRun = false) {
       if (mesaRes.ok) {
         document.getElementById('rs3').textContent = fmtN(res.total);
         setProcessStatus('ok', 'Mesa atualizada com sucesso!');
-        appendLog(5, '✅ MesaDistribuicao.exe executado com sucesso.');
+        appendLog(5, 'MesaDistribuicao.exe executado com sucesso.');
         appendAutoHistory(`Mesa atualizada com ${fmtN(res.total)} registros`);
-        toast('✅ Base gerada e subida na mesa com sucesso!', 'ok');
+        toast('Base gerada e subida na mesa com sucesso!', 'ok');
       } else {
         setProcessStatus('warn', 'Erro ao executar Mesa');
-        appendLog(5, '⚠ ' + mesaRes.msg);
+        appendLog(5, 'Aviso: ' + mesaRes.msg);
         toast('CSV gerado, mas houve erro ao subir na mesa:\n' + mesaRes.msg, 'err');
       }
     } else {
@@ -2314,13 +2468,13 @@ async function executarFluxo(isAutoRun = false) {
 
   } catch(e) {
     setProcessStatus('err', 'Erro: ' + e.message);
-    appendLog('!', '❌ ' + e.message);
-    toast('❌ ' + e.message, 'err');
+    appendLog('!', 'Erro: ' + e.message);
+    toast('Erro: ' + e.message, 'err');
     showProgress(false);
   } finally {
     S.flowRunning = false;
     btn.disabled = false;
-    btn.innerHTML = '⚡ Gerar Agora';
+    btn.innerHTML = `${iconMarkup('zap')} Gerar Agora`;
   }
 }
 
@@ -2336,7 +2490,7 @@ async function onAutoToggle() {
     startCountdown(mins * 60);
     document.getElementById('autoBadge').style.display = 'inline';
     document.getElementById('autoActiveBar').classList.add('show');
-    toast('🔄 Modo automático ativado', 'inf');
+    toast('Modo automatico ativado', 'inf');
   } else {
     S.autoActive = false;
     if (S.autoTimer) clearInterval(S.autoTimer);
@@ -2345,7 +2499,7 @@ async function onAutoToggle() {
     document.getElementById('autoActiveBar').classList.remove('show');
     document.getElementById('autoCountdown').textContent = '';
     document.getElementById('autoNextIn').textContent = '—';
-    toast('⏸ Modo automático desativado', 'inf');
+    toast('Modo automatico desativado', 'inf');
   }
 }
 
@@ -2412,9 +2566,15 @@ function applyConfigToUI(cfg) {
   document.getElementById('cfg-rs').value      = cfg.PATH_EQTL_RS      || '';
   document.getElementById('cfg-go').value      = cfg.PATH_EQTL_GO      || '';
   document.getElementById('cfg-bkoall').value  = cfg.PATH_BKO_ALL      || '';
+  document.getElementById('cfg-input-mesa-dir').value = cfg.INPUT_MESA_DIR || '';
+  document.getElementById('cfg-log-dir').value = cfg.LOG_DIR || '';
+  document.getElementById('cfg-input-mesa-effective').textContent = cfg.INPUT_MESA_DIR_EFFECTIVE ? `Atual: ${cfg.INPUT_MESA_DIR_EFFECTIVE}` : '';
+  document.getElementById('cfg-log-effective').textContent = cfg.LOG_DIR_EFFECTIVE ? `Atual: ${cfg.LOG_DIR_EFFECTIVE}` : '';
   document.getElementById('cfg-region').value  = cfg.ORG_REGION        || 'sa_east_1';
   document.getElementById('cfg-cid').value     = cfg.CLIENT_ID         || '';
-  document.getElementById('cfg-csecret').value = cfg.CLIENT_SECRET     || '';
+  const secretInput = document.getElementById('cfg-csecret');
+  secretInput.value = '';
+  secretInput.placeholder = cfg.CLIENT_SECRET_CONFIGURED ? 'Client Secret salvo (deixe vazio para manter)' : 'Client Secret';
   document.getElementById('cfg-queues').value  = (cfg.QUEUE_IDS || []).join('\n');
   document.getElementById('cfg-cleanup-queues').value = (cfg.CLEANUP_QUEUE_IDS || []).join('\n');
   document.getElementById('cfg-cleanup-concurrency').value = cfg.CLEANUP_CONCURRENCY || 10;
@@ -2457,6 +2617,11 @@ async function pickCfgFile(inputId, exts) {
   if (p) document.getElementById(inputId).value = p;
 }
 
+async function pickCfgFolder(inputId) {
+  const p = await api.pickFolder();
+  if (p) document.getElementById(inputId).value = p;
+}
+
 async function saveConfig() {
   const xlsInputs = document.querySelectorAll('[id^="cfg-xls-"]');
   const xlsPaths  = [...xlsInputs].map(i => i.value).filter(Boolean);
@@ -2471,6 +2636,8 @@ async function saveConfig() {
     PATH_EQTL_GO      : document.getElementById('cfg-go').value,
     PATH_BKO_ALL      : document.getElementById('cfg-bkoall').value,
     PATHS_XLS         : xlsPaths,
+    INPUT_MESA_DIR    : document.getElementById('cfg-input-mesa-dir').value,
+    LOG_DIR           : document.getElementById('cfg-log-dir').value,
     ORG_REGION        : document.getElementById('cfg-region').value || 'sa_east_1',
     CLIENT_ID         : document.getElementById('cfg-cid').value,
     CLIENT_SECRET     : document.getElementById('cfg-csecret').value,
@@ -2489,7 +2656,7 @@ async function saveConfig() {
     EXTRACTION_CREDENTIALS: getExtractionCredentialsFromUI(),
   };
   await api.setConfig(cfg);
-  toast('💾 Configurações salvas', 'ok');
+  toast('Configuracoes salvas', 'ok');
 }
 
 async function testGenesys() {
@@ -2509,20 +2676,24 @@ async function testGenesys() {
     resultEl.style.background = 'var(--accent-g)11';
     resultEl.style.border = '1px solid var(--accent-g)44';
     resultEl.style.color = 'var(--accent-g)';
-    resultEl.innerHTML = `✅ Conectado com sucesso!<br>ORG_REGION: <b>${res.region}</b><br>E-mails aguardando nas filas: <b>${res.total}</b>`;
+    resultEl.innerHTML = `${iconMarkup('check')} Conectado com sucesso!<br>ORG_REGION: <b>${res.region}</b><br>E-mails aguardando nas filas: <b>${res.total}</b>`;
     setGenesysStatus(true, `Genesys OK · ${res.region} · ${res.total} na fila`);
-    toast(`✅ Genesys conectado! ${res.total} e-mail(s) aguardando.`, 'ok');
+    toast(`Genesys conectado. ${res.total} e-mail(s) aguardando.`, 'ok');
   } else {
     resultEl.style.background = 'var(--accent-r)11';
     resultEl.style.border = '1px solid var(--accent-r)44';
     resultEl.style.color = 'var(--accent-r)';
-    resultEl.innerHTML = `❌ Falha na conexão<br>ORG_REGION tentada: <b>${res.region}</b><br>Erro: ${esc(res.msg)}<br><br><span style="color:var(--accent-y)">💡 Verifique se ORG_REGION está como <b>sa_east_1</b> no campo acima e salve antes de testar.</span>`;
+    resultEl.innerHTML = `Falha na conexao<br>ORG_REGION tentada: <b>${res.region}</b><br>Erro: ${esc(res.msg)}<br><br><span style="color:var(--accent-y)">Verifique se ORG_REGION esta como <b>sa_east_1</b> no campo acima e salve antes de testar.</span>`;
     setGenesysStatus(false, 'Genesys: ' + res.msg);
-    toast('❌ Genesys: ' + res.msg, 'err');
+    toast('Genesys: ' + res.msg, 'err');
   }
 }
 
 // ─── UI helpers ─────────────────────────────────────────────────────────────
+function iconMarkup(name, cls = 'icon icon-sm') {
+  return `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+}
+
 function showProgress(show) {
   document.getElementById('progressWrap').classList.toggle('show', show);
   if (show) document.getElementById('progressLog').innerHTML = '';
@@ -2530,6 +2701,32 @@ function showProgress(show) {
 
 function hideResult() {
   document.getElementById('resultBlock').classList.remove('show');
+}
+
+const STATE_SUMMARY_ORDER = ['MA', 'PA', 'PI', 'AL', 'GO', 'CEA', 'CEEE', 'CSA'];
+
+function renderStateSummaryCards(estados = {}, generated = false) {
+  const el = document.getElementById('stateSummaryCards');
+  if (!el) return;
+  if (!generated) {
+    el.innerHTML = '<div class="state-summary-empty">Gere a base para ver quantos protocolos vao para cada estado.</div>';
+    return;
+  }
+
+  const keys = [
+    ...STATE_SUMMARY_ORDER,
+    ...Object.keys(estados || {}).filter(k => !STATE_SUMMARY_ORDER.includes(k)).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  ];
+  const uniqueKeys = [...new Set(keys)];
+  el.innerHTML = uniqueKeys.map(estado => {
+    const total = Number(estados?.[estado] || 0);
+    return `
+      <div class="state-summary-card ${total ? 'has-count' : ''}">
+        <div class="state-summary-label">${esc(estado)}</div>
+        <div class="state-summary-value">${fmtN(total)}</div>
+        <div class="state-summary-sub">final para mesa</div>
+      </div>`;
+  }).join('');
 }
 
 function showResult(res) {
@@ -2543,6 +2740,7 @@ function showResult(res) {
   // Bar chart por estado
   const barEl = document.getElementById('barEstado');
   const estados = res.stats?.porEstado || {};
+  renderStateSummaryCards(estados, true);
   const max = Math.max(...Object.values(estados), 1);
   barEl.innerHTML = Object.entries(estados)
     .sort((a,b) => b[1]-a[1])

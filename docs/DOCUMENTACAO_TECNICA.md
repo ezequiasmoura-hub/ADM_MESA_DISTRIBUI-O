@@ -2,53 +2,59 @@
 
 ## Visao geral
 
-O projeto e uma aplicacao Electron com processo principal em `main.js`, interface em `index.html` e bridge segura em `preload.js`. A aplicacao concentra tres fluxos principais:
+O projeto e uma aplicacao Electron que concentra tres fluxos principais:
 
 - extrair bases operacionais;
-- gerar CSV de insercao na mesa;
-- consultar e limpar conversas da mesa no Genesys.
+- gerar `mesa_distribuicao.csv`;
+- consultar e limpar conversas da mesa no Genesys Cloud.
 
-O codigo atual privilegia compatibilidade operacional. Por isso, `main.js` ainda concentra muitas responsabilidades. Refatoracoes devem ser feitas com cuidado e com testes de regressao contra bases reais/exportadas do BI.
+O processo principal (`main.js`) atua como backend local via IPC. Nao ha servidor Express. A interface fica em `index.html` e recebe apenas uma API limitada por `preload.js`.
 
-## Arquitetura
+## Arquitetura atual
 
 ```text
 index.html
-  UI, filtros, tabelas, progresso, configuracoes
+  interface, filtros, cards, tabelas, configuracoes e progresso
 
 preload.js
-  expoe window.api via contextBridge
+  bridge segura window.api
 
 main.js
-  IPC handlers
+  janela Electron
   configuracao
   Genesys SDK
-  leitura de bases
   geracao CSV
   limpeza
   extracoes
-  execucao de MesaDistribuicao.py/.exe
+  subida externa
+  logs
 
 scripts/extracao/
   extratores JavaScript chamados pela UI e por npm scripts
+
+assets/
+  icone e logo
+
+electron-builder.yml
+  build Windows
 ```
 
 ## Principais arquivos
 
-- `main.js`: autentica no Genesys, consulta filas, gera CSV, limpa conversas, executa scripts de extracao e executa o processo de subida.
-- `preload.js`: disponibiliza chamadas IPC como `gerarBase`, `listarMesa`, `limparMesa`, `runExtracao` e eventos de progresso.
-- `index.html`: contem CSS, HTML e JS da interface.
-- `scripts/extracao/shared.js`: utilitarios dos extratores, carregamento de `.env`, login e escrita CSV.
-- `scripts/extracao/site-novo.js`: baixa os XLS `01_Todos_Aberto.xls` e `02_Todos_Pendente.xls`.
+- `main.js`: regras de negocio, IPC, Genesys, CSV, limpeza, extracoes, subida externa e logs.
+- `preload.js`: expoe `window.api` por `contextBridge`.
+- `index.html`: UI desktop completa.
+- `scripts/extracao/shared.js`: funcoes comuns dos extratores.
+- `scripts/extracao/site-novo.js`: extrai XLS do Site Novo.
 - `scripts/extracao/site-antigo.js`: gera `bko_all.csv`.
 - `scripts/extracao/go.js`: gera `EQTL_GO.csv`.
 - `scripts/extracao/rs.js`: gera `EQTL_RS.csv`.
-- `inputMesa/MesaDistribuicao.py`: script externo preferencial para subir a mesa quando existir. Este arquivo e local/sensivel e nao deve ser versionado enquanto contiver credenciais.
-- `inputMesa/MesaDistribuicao.exe`: fallback externo de subida.
+- `electron-builder.yml`: empacotamento Windows.
+- `assets/icon.ico`: icone usado pela janela/build.
 
-## IPC exposto para a UI
+## IPC
 
-`preload.js` expoe:
+Canais principais expostos no `preload.js`:
 
 - `getConfig` / `setConfig`;
 - `pickFile`, `pickFiles`, `pickFolder`;
@@ -62,211 +68,193 @@ scripts/extracao/
 - `startAuto` / `stopAuto`;
 - eventos `progress`, `auto-trigger`, `genesys-status`, `extraction-log`, `cleanup-progress`.
 
+Novos canais devem ser pequenos, validados no `main.js` e nunca expor Node diretamente ao renderer.
+
 ## Configuracao
 
-Os defaults estao em `CONFIG` dentro de `main.js`. A ordem de carregamento e:
+A ordem de carga e:
 
-1. `.env` na raiz;
-2. `inputMesa/.env`;
-3. arquivo salvo pela UI em `app.getPath('userData')/mesa_config.json`;
-4. normalizacao em `normalizeConfigAfterLoad()`.
+1. defaults em `CONFIG`;
+2. `.env` na raiz;
+3. `inputMesa/.env`;
+4. `.env` na pasta de dados do usuario;
+5. `inputMesa/.env` na pasta de dados do usuario;
+6. `mesa_config.json` salvo pela UI;
+7. `normalizeConfigAfterLoad()`.
 
-Credenciais vazias salvas pela UI nao sobrescrevem `CLIENT_ID`, `CLIENT_SECRET` e `ORG_REGION`.
+`createPublicConfig()` monta a versao enviada ao renderer. Essa versao nao inclui `CLIENT_SECRET` nem senhas de extracao em texto claro.
 
-## Integracao Genesys
+## Genesys
 
-A autenticacao usa:
+Autenticacao:
 
 ```js
 client.loginClientCredentialsGrant(CONFIG.CLIENT_ID, CONFIG.CLIENT_SECRET)
 ```
 
-A regiao vem de:
+Regiao:
 
 ```js
 platformClient.PureCloudRegionHosts[CONFIG.ORG_REGION]
 ```
 
-O padrao para Brasil e `sa_east_1`.
+Principais APIs:
 
-Principais APIs usadas:
-
-- `AnalyticsApi.postAnalyticsConversationsActivityQuery`
-- `AnalyticsApi.postAnalyticsConversationsDetailsQuery`
-- `AnalyticsApi.getAnalyticsConversationDetails`
-- `ConversationsApi.getConversation`
-- `ConversationsApi.postConversationDisconnect`
-
-O script externo de subida, quando usado, faz POST em `/api/v2/conversations/emails`.
+- `AnalyticsApi.postAnalyticsConversationsActivityQuery`;
+- `AnalyticsApi.postAnalyticsConversationsDetailsQuery`;
+- `AnalyticsApi.getAnalyticsConversationDetails`;
+- `ConversationsApi.getConversation`;
+- `ConversationsApi.postConversationDisconnect`.
 
 ## Consulta da mesa
 
-`consultarMesaGenesys()` monta a query por filas em `buildMesaActivityQuery()`. A query considera:
-
-- `queueId` em lista;
-- `mediaType=email`;
-- metrica `oWaiting`;
-- agrupamento por `conversationId` e `queueId`.
+`consultarMesaGenesys()` usa query por `queueId`, `mediaType=email`, metrica `oWaiting` e agrupamento por `conversationId`/`queueId`.
 
 Modos:
 
-- `protocolOnly=true`: usado na geracao de CSV para obter apenas protocolos e deduplicar rapidamente.
-- `includeDetails=false`: usado antes de limpar selecionados, para validar se os IDs ainda estao na mesa.
-- `includeDetails=true`: usado na aba de limpeza para montar a tabela completa.
+- `protocolOnly=true`: usado na geracao do CSV para deduplicacao rapida.
+- `includeDetails=false`: usado antes de limpar selecionados para validar se IDs ainda estao na mesa.
+- `includeDetails=true`: usado na aba de limpeza para montar tabela com estado, tipo, prazo e dados auxiliares.
 
-Quando faltam detalhes, a aplicacao cruza a mesa com as bases locais para preencher tipo, estado, prazo, status, data, origem e skill.
+Quando a Genesys nao devolve todos os detalhes, a aplicacao cruza com as bases locais para enriquecer os registros.
 
 ## Geracao de CSV
 
-`gerarBaseCompleta(filtros)` executa:
+`gerarBaseCompleta(filtros)`:
 
-1. consulta rapida ao Genesys para montar `protocolosNaMesa`;
-2. leitura da planilha de priorizacao;
-3. leitura dos XLS do Site Novo;
-4. leitura de `EQTL_RS.csv`, `EQTL_GO.csv` e `bko_all.csv`;
-5. normalizacao de protocolo, empresa, servico e prazo;
-6. filtros da UI;
-7. remocao de duplicados ja presentes na mesa;
-8. ordenacao por prioridade;
-9. escrita de `inputMesa/mesa_distribuicao.csv`.
+1. consulta protocolos atuais da mesa;
+2. le planilha de priorizacao;
+3. le XLS do Site Novo;
+4. le `EQTL_RS.csv`, `EQTL_GO.csv` e `bko_all.csv`;
+5. normaliza estado, protocolo, servico, skill, prazo e origem;
+6. aplica filtros da UI;
+7. remove protocolos ja presentes na mesa;
+8. calcula resumos e distribuicao por estado;
+9. grava `mesa_distribuicao.csv` em `getInputMesaDir()`.
 
-O header do CSV e definido em `CSV_HEADER_MESA`:
+Header:
 
 ```text
 Regiao;Nota;Conclusao_desejada;Mandante;Protocolo;Tipo_de_servico;Coluna;Dados;Skill;Fluxo;Prioridade;STATUS_PRAZO_MESA
 ```
 
-## Filtros da geracao
+## Extracoes
 
-Estado:
+`runExtractionScript(id)` executa os scripts via `spawn`.
 
-- MA, PA, PI, AL, GO, CEA, CEEE, CSA.
+No desenvolvimento, usa `node` ou `NODE_BIN`. No app empacotado, quando `NODE_BIN` esta vazio, usa o proprio executavel com:
 
-SLA:
+```env
+ELECTRON_RUN_AS_NODE=1
+```
 
-- `passivo`: `0-PASSIVO`;
-- `hoje`: `1-VENCE HOJE`;
-- `amanha`: qualquer `2-VENCE D+N`.
+A UI permite rodar os quatro extratores em concorrencia. Internamente, a execucao em lote usa `Promise.all()` sobre os IDs selecionados.
 
-Outros:
+Logs de extracao ficam em:
 
-- responsavel;
-- site/origem;
-- skill;
-- tipo de servico;
-- e-mail/dominio.
-
-Skills e tipos de servico sao dinamicos e aparecem apos uma geracao.
+```text
+getLogDir('extracoes')
+```
 
 ## Limpeza
 
-O fluxo principal esta em `ipcMain.handle('limpar-mesa')`.
+O fluxo principal esta no handler `limpar-mesa`.
 
-Modos:
+Protecoes:
 
-- `selected`: limpa IDs selecionados pela UI.
-- `queueIds`: permitido somente sem filtros ou apenas com filtro de estado. A aplicacao consulta os IDs de fila configurados e monta a fila no momento da limpeza.
-
-Confirmacao:
-
-- a UI sempre exibe `confirm()`;
-- o backend exige `confirmText === 'LIMPAR'`;
-- se a confirmacao estiver ausente ou invalida, a limpeza nao roda e um log de falha e gerado.
+- exige `confirmText === 'LIMPAR'`;
+- valida modo selecionado;
+- no modo `selected`, usa somente IDs selecionados;
+- no modo `queueIds`, consulta as filas autorizadas para o estado/mesa;
+- nao repete sucesso ja processado durante a fila;
+- registra erros por conversa.
 
 ## Rate limiter global
 
-O rate limiter esta em `createCleanupRateLimiter()`.
+`createCleanupRateLimiter()` controla o inicio das chamadas de limpeza.
 
-Ele usa:
+Parametros:
 
-- `CLEANUP_RATE_LIMIT_PER_MINUTE`, default `280`, maximo normalizado `300`;
-- intervalo calculado `Math.ceil(60000 / rpm)`;
-- uma cadeia `turnChain` para serializar o inicio das chamadas;
-- pausa global compartilhada quando recebe `429`.
+- `CLEANUP_RATE_LIMIT_PER_MINUTE`;
+- `CLEANUP_RATE_LIMIT_FALLBACK_SECONDS`.
 
-Esse desenho garante que o paralelismo nao ultrapasse o limite global de chamadas iniciadas por minuto.
+Mesmo com `CLEANUP_CONCURRENCY=10`, nenhuma chamada passa pelo limiter sem aguardar sua vez.
+
+Em `429`:
+
+1. le `Retry-After`;
+2. se ausente, usa fallback;
+3. emite status para UI;
+4. pausa globalmente;
+5. continua a mesma conversa depois da espera.
 
 ## Paralelismo
 
 `disconnectConversationsControlled()` usa `mapLimit()` com `CLEANUP_CONCURRENCY`.
 
-O paralelismo controla quantas conversas podem estar em execucao simultanea. Antes de cada chamada de desconexao, o worker precisa passar pelo rate limiter global.
-
-Padroes:
-
-- `CLEANUP_CONCURRENCY=10`;
-- `CLEANUP_RATE_LIMIT_PER_MINUTE=280`;
-- `CLEANUP_RATE_LIMIT_FALLBACK_SECONDS=30`.
-
-## Retry e backoff
-
-`disconnectConversationSafe()`:
-
-- tenta a chamada `postConversationDisconnect`;
-- se receber `429`, chama `limiter.pauseFrom429()` e repete a mesma conversa;
-- se receber `408`, `500`, `502`, `503` ou `504`, tenta novamente com pequeno backoff;
-- depois das tentativas, retorna falha para aquela conversa.
-
-O `429` nao consome a conversa como erro final. Ela volta para tentativa depois da pausa.
-
-## Controle de progresso
-
-Durante a limpeza, `emitCleanupProgress()` envia eventos para a UI:
-
-- total;
-- processadas;
-- sucesso;
-- erro;
-- pendentes;
-- paralelo;
-- req/min;
-- status;
-- contagem de rate limit.
-
-Esse progresso e mantido em memoria. Nao ha checkpoint persistente para retomada depois de fechar o app.
+O paralelismo controla quantidade de conversas simultaneas; o rate limiter controla o total de requisicoes por minuto.
 
 ## Logs
 
-- Limpeza: `logs/limpeza-mesa-AAAA-MM-DD.jsonl`.
-- Extracoes: `logs/extracoes/<id>_<timestamp>.log`.
-- Subida Python: quando executada diretamente, pode gerar `inputMesa/logs_*.txt`.
-
-Logs de extracao passam por `sanitizeProcessOutput()`, que mascara `CLIENT_ID`, `CLIENT_SECRET`, credenciais de extracao e bearer tokens conhecidos.
-
-## Extracoes
-
-`runExtractionScript(id)` executa cada script com `spawn`, `shell:false`, runtime Node por padrao, variaveis de ambiente especificas e logs sanitizados.
-
-Scripts:
-
-- `siteNovo` -> `scripts/extracao/site-novo.js`;
-- `siteAntigo` -> `scripts/extracao/site-antigo.js`;
-- `go` -> `scripts/extracao/go.js`;
-- `rs` -> `scripts/extracao/rs.js`.
-
-O botao **Rodar 4 scripts** executa todos em sequencia.
-
-## Subida da mesa
-
-`executar-mesa` procura:
-
-1. `inputMesa/MesaDistribuicao.py`;
-2. se nao existir, `inputMesa/MesaDistribuicao.exe`.
-
-Se usar Python, executa:
+Diretorio padrao:
 
 ```text
-python -X utf8 inputMesa/MesaDistribuicao.py
+getLogDir()
 ```
 
-O app injeta:
+Em desenvolvimento, se `LOG_DIR` nao estiver configurado, usa a pasta de dados do usuario do Electron. Em builds empacotados, tambem usa `app.getPath('userData')/logs`.
 
-- `PYTHONIOENCODING=utf-8`;
-- `PYTHONUTF8=1`;
-- `MESA_UPLOAD_STRATEGY`;
-- `MESA_UPLOAD_WORKERS`;
-- `MESA_UPLOAD_INTERVAL_SECONDS`;
-- `MESA_UPLOAD_BATCH_PAUSE_SECONDS`.
+Tipos:
+
+- aplicacao: `app-AAAA-MM-DD.log`;
+- limpeza: `limpeza-mesa-AAAA-MM-DD.jsonl`;
+- extracoes: `extracoes/<id>_<timestamp>.log`.
+
+Logs passam por sanitizacao para esconder tokens, `CLIENT_SECRET`, `CLIENT_ID` e senhas conhecidas.
+
+## Subida externa
+
+`executar-mesa` procura, dentro de `getInputMesaDir()`:
+
+1. `MesaDistribuicao.py`;
+2. `MesaDistribuicao.exe`.
+
+Se usar Python:
+
+```text
+python -X utf8 MesaDistribuicao.py
+```
+
+O app injeta variaveis de ambiente para encoding, estrategia, workers, intervalo, pausa e timeout.
+
+## Build desktop
+
+Empacotador:
+
+```text
+electron-builder
+```
+
+Comandos:
+
+```powershell
+npm run build
+npm run dist:win
+```
+
+Configuracao:
+
+```text
+electron-builder.yml
+```
+
+Saidas:
+
+```text
+dist/win-unpacked/
+dist/*-Setup-x64.exe
+dist/*-Portable-x64.exe
+```
 
 ## Debug
 
@@ -274,43 +262,36 @@ Comandos uteis:
 
 ```powershell
 npm run check
+npm run smoke
 npm start
+npm run dist:win
 npm run extract:site-novo
 npm run extract:site-antigo
 npm run extract:go
 npm run extract:rs
 ```
 
-Para investigar limpeza:
+## Cuidados ao alterar
 
-1. consultar `logs/limpeza-mesa-AAAA-MM-DD.jsonl`;
-2. confirmar `QUEUE_IDS` e `CLEANUP_QUEUE_IDS`;
-3. testar Genesys pela UI;
-4. reduzir `CLEANUP_RATE_LIMIT_PER_MINUTE` se houver muito `429`;
-5. validar se as bases locais estao atualizadas para enriquecer a tabela.
+- Manter a limpeza no `main.js`/processo principal.
+- Nao colocar token ou secret no renderer.
+- Testar consulta antes de limpeza real.
+- Preservar `contextIsolation: true` e `nodeIntegration: false`.
+- Atualizar `.env.example` quando criar configuracao nova.
+- Atualizar docs quando mudar fluxo de build, limpeza ou API.
+- Rodar `npm run check` antes de commit.
 
-## Adicionar funcionalidades
+## Refatoracao recomendada
 
-Recomendacoes:
+O codigo atual esta funcional, mas `main.js` deve ser dividido em modulos quando houver tempo de teste:
 
-- manter qualquer acao destrutiva no `main.js`, nunca diretamente no frontend;
-- exigir confirmacao explicita;
-- gerar log;
-- nao logar tokens ou secrets;
-- usar `preload.js` para expor somente IPC necessario;
-- preservar `contextIsolation: true` e `nodeIntegration: false`;
-- criar configuracoes novas em `CONFIG`, UI e `.env.example`;
-- rodar `npm run check`.
+- `genesysService`;
+- `mesaCsvService`;
+- `cleanupService`;
+- `extractionService`;
+- `uploadService`;
+- `configService`;
+- `loggingService`;
+- `rateLimiter`.
 
-## Cuidados com credenciais
-
-Nao versionar:
-
-- `.env`;
-- `inputMesa/.env`;
-- logs;
-- CSVs gerados;
-- executaveis;
-- scripts com client secret embutido.
-
-O arquivo local `inputMesa/MesaDistribuicao.py` encontrado no ambiente contem credenciais embutidas. Ele deve ser tratado como artefato sensivel e refatorado antes de qualquer commit de codigo-fonte operacional.
+A prioridade e manter comportamento identico antes de melhorar a estrutura.

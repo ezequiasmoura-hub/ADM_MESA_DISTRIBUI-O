@@ -6,10 +6,13 @@ const { execFile, spawn } = require('child_process');
 // ── Carrega .env da pasta do projeto e do inputMesa como fallback ─────────────
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 require('dotenv').config({ path: path.join(__dirname, 'inputMesa', '.env') });
+require('dotenv').config({ path: path.join(app.getPath('userData'), '.env') });
+require('dotenv').config({ path: path.join(app.getPath('userData'), 'inputMesa', '.env') });
 
 let mainWindow;
 let autoTimer = null;
-let extractionRunning = false;
+const runningExtractions = new Set();
+const IS_SMOKE_TEST = process.argv.includes('--smoke-test');
 
 // ── Genesys: conecta usando EXATAMENTE o mesmo método do index.js funcional ──
 // platformClient.PureCloudRegionHosts[ORG_REGION] é o enum correto do SDK
@@ -76,6 +79,8 @@ let CONFIG = {
   PATH_EQTL_GO     : "H:\\TEMOTEO - NAO ABRA\\Base\\EQTL_GO.csv",
   PATH_BKO_ALL     : "H:\\TEMOTEO - NAO ABRA\\Base\\bko_all.csv",
   PATHS_XLS        : [...DEFAULT_SITE_NOVO_XLS_PATHS],
+  INPUT_MESA_DIR   : process.env.INPUT_MESA_DIR || '',
+  LOG_DIR          : process.env.LOG_DIR || '',
   // Lê do .env — mesmas variáveis do index.js funcional
   ORG_REGION       : process.env.ORG_REGION     || 'sa_east_1',
   CLIENT_ID        : process.env.CLIENT_ID       || '',
@@ -153,6 +158,40 @@ const CONFIG_PATH = path.join(app.getPath('userData'), 'mesa_config.json');
 const DEFAULT_EXTRACTION_SCRIPTS = JSON.parse(JSON.stringify(CONFIG.EXTRACTION_SCRIPTS));
 const DEFAULT_EXTRACTION_CREDENTIALS = JSON.parse(JSON.stringify(CONFIG.EXTRACTION_CREDENTIALS));
 
+const ALLOWED_CONFIG_KEYS = new Set([
+  'PATH_PRIORIZACAO',
+  'PATH_EQTL_RS',
+  'PATH_EQTL_GO',
+  'PATH_BKO_ALL',
+  'PATHS_XLS',
+  'INPUT_MESA_DIR',
+  'LOG_DIR',
+  'ORG_REGION',
+  'CLIENT_ID',
+  'CLIENT_SECRET',
+  'QUEUE_IDS',
+  'EXTRACTION_SCRIPTS',
+  'EXTRACTION_CREDENTIALS',
+  'NODE_BIN',
+  'PYTHON_BIN',
+  'MESA_DETAIL_RETRIES',
+  'MESA_DETAIL_RETRY_DELAY_MS',
+  'MESA_PROTOCOL_CONCURRENCY',
+  'MESA_PROTOCOL_INTERVAL_DAYS',
+  'MESA_UPLOAD_STRATEGY',
+  'MESA_UPLOAD_WORKERS',
+  'MESA_UPLOAD_INTERVAL_SECONDS',
+  'MESA_UPLOAD_BATCH_PAUSE_SECONDS',
+  'MESA_UPLOAD_TIMEOUT_MINUTES',
+  'CLEANUP_CONCURRENCY',
+  'CLEANUP_RATE_LIMIT_PER_MINUTE',
+  'CLEANUP_RATE_LIMIT_FALLBACK_SECONDS',
+  'CLEANUP_START_INTERVAL_MS',
+  'CLEANUP_QUEUE_IDS',
+  'AUTO_INTERVAL_MIN',
+  'UI_THEME',
+]);
+
 const CSV_HEADER_MESA = [
   'Regiao', 'Nota', 'Conclusao_desejada', 'Mandante', 'Protocolo', 'Tipo_de_servico',
   'Coluna', 'Dados', 'Skill', 'Fluxo', 'Prioridade', 'STATUS_PRAZO_MESA'
@@ -188,6 +227,58 @@ function getCleanupQueueIds() {
   return [...new Set(raw.map(id => id && id.toString().trim()).filter(Boolean))];
 }
 
+function ensureDir(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function getInputMesaDir() {
+  const configured = String(CONFIG.INPUT_MESA_DIR || process.env.INPUT_MESA_DIR || '').trim();
+  if (configured) return configured;
+  return app.isPackaged
+    ? path.join(app.getPath('userData'), 'inputMesa')
+    : path.join(__dirname, 'inputMesa');
+}
+
+function getLogDir(...parts) {
+  const configured = String(CONFIG.LOG_DIR || process.env.LOG_DIR || '').trim();
+  const root = configured || path.join(app.getPath('userData'), 'logs');
+  return path.join(root, ...parts);
+}
+
+function createPublicConfig() {
+  const extractionCredentials = {};
+  for (const id of EXTRACTION_IDS) {
+    const current = CONFIG.EXTRACTION_CREDENTIALS?.[id] || {};
+    extractionCredentials[id] = {
+      username: current.username || '',
+      password: '',
+      passwordConfigured: !!current.password,
+    };
+  }
+
+  return {
+    ...CONFIG,
+    CLIENT_SECRET: '',
+    CLIENT_SECRET_CONFIGURED: !!CONFIG.CLIENT_SECRET,
+    EXTRACTION_CREDENTIALS: extractionCredentials,
+    QUEUE_IDS: getQueueIds(),
+    INPUT_MESA_DIR_EFFECTIVE: getInputMesaDir(),
+    LOG_DIR_EFFECTIVE: getLogDir(),
+  };
+}
+
+function getNodeExecution() {
+  const configured = String(CONFIG.NODE_BIN || '').trim();
+  if (configured && configured !== 'node') {
+    return { command: configured, env: {} };
+  }
+  if (app.isPackaged) {
+    return { command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } };
+  }
+  return { command: configured || 'node', env: {} };
+}
+
 function normalizePathCompare(p) {
   return String(p || '').replace(/\//g, '\\').toLowerCase();
 }
@@ -199,6 +290,8 @@ function isLegacySiteNovoXlsPath(p) {
 }
 
 function normalizeConfigAfterLoad() {
+  CONFIG.INPUT_MESA_DIR = String(CONFIG.INPUT_MESA_DIR || '').trim();
+  CONFIG.LOG_DIR = String(CONFIG.LOG_DIR || '').trim();
   if (!Array.isArray(CONFIG.PATHS_XLS) || !CONFIG.PATHS_XLS.length || CONFIG.PATHS_XLS.some(isLegacySiteNovoXlsPath)) {
     CONFIG.PATHS_XLS = [...DEFAULT_SITE_NOVO_XLS_PATHS];
   }
@@ -697,12 +790,29 @@ async function consultarMesaPorQueueIds(queueIds) {
 }
 
 function appendCleanupLog(entry) {
-  const logDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  const logDir = ensureDir(getLogDir());
   const day = new Date().toISOString().slice(0, 10);
   const logPath = path.join(logDir, `limpeza-mesa-${day}.jsonl`);
   fs.appendFileSync(logPath, JSON.stringify(entry) + '\n', 'utf8');
   return logPath;
+}
+
+function appendAppLog(level, msg, details = {}) {
+  try {
+    const logDir = ensureDir(getLogDir());
+    const day = new Date().toISOString().slice(0, 10);
+    const logPath = path.join(logDir, `app-${day}.log`);
+    const entry = sanitizeProcessOutput(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level,
+      msg,
+      details,
+    }));
+    fs.appendFileSync(logPath, entry + '\n', 'utf8');
+    return logPath;
+  } catch (_) {
+    return null;
+  }
 }
 
 function getExtractionConfig(id) {
@@ -781,10 +891,10 @@ function runExtractionScript(id) {
     });
   }
 
-  const runtime = script.runtime === 'python' ? (CONFIG.PYTHON_BIN || 'python') : (CONFIG.NODE_BIN || 'node');
+  const nodeExecution = getNodeExecution();
+  const runtime = script.runtime === 'python' ? (CONFIG.PYTHON_BIN || 'python') : nodeExecution.command;
   const cwd = script.cwd && fs.existsSync(script.cwd) ? script.cwd : path.dirname(scriptPath);
-  const logDir = path.join(__dirname, 'logs', 'extracoes');
-  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  const logDir = ensureDir(getLogDir('extracoes'));
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const logPath = path.join(logDir, `${id}_${ts}.log`);
 
@@ -797,7 +907,7 @@ function runExtractionScript(id) {
       cwd,
       windowsHide: true,
       shell: false,
-      env: { ...process.env, ...getExtractionEnv(id) },
+      env: { ...process.env, ...nodeExecution.env, ...getExtractionEnv(id) },
     });
 
     let outputTail = '';
@@ -826,6 +936,18 @@ function runExtractionScript(id) {
       resolve({ id, ok, label: script.label, code, msg, logPath, outputTail });
     });
   });
+}
+
+async function runExtractionScriptTracked(id) {
+  if (runningExtractions.has(id)) {
+    return { id, ok: false, msg: 'Extracao ja esta em andamento.' };
+  }
+  runningExtractions.add(id);
+  try {
+    return await runExtractionScript(id);
+  } finally {
+    runningExtractions.delete(id);
+  }
 }
 
 function parseRetryAfterSeconds(error, fallbackSeconds) {
@@ -1030,7 +1152,13 @@ function mergeExtractionCredentials(incoming) {
 }
 
 function applyConfigPatch(newCfg = {}) {
-  const patch = { ...newCfg };
+  const patch = {};
+  for (const [key, value] of Object.entries(newCfg || {})) {
+    if (ALLOWED_CONFIG_KEYS.has(key)) patch[key] = value;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'CLIENT_SECRET') && !String(patch.CLIENT_SECRET || '').trim()) {
+    delete patch.CLIENT_SECRET;
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'EXTRACTION_CREDENTIALS')) {
     patch.EXTRACTION_CREDENTIALS = mergeExtractionCredentials(patch.EXTRACTION_CREDENTIALS);
   }
@@ -1051,15 +1179,32 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      devTools: !app.isPackaged,
     },
-    icon: path.join(__dirname, 'icon.png'),
+    icon: path.join(__dirname, 'assets', 'icon.ico'),
   });
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', event => event.preventDefault());
   mainWindow.loadFile('index.html');
 }
 
 app.whenReady().then(() => {
   loadConfig();
+  appendAppLog('info', 'Aplicacao iniciada', {
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    inputMesaDir: getInputMesaDir(),
+    logDir: getLogDir(),
+  });
   createWindow();
+  if (IS_SMOKE_TEST) {
+    setTimeout(() => {
+      appendAppLog('info', 'Smoke test finalizado');
+      app.quit();
+    }, 1500);
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -1073,7 +1218,7 @@ ipcMain.on('win-minimize', () => mainWindow.minimize());
 ipcMain.on('win-maximize', () => mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize());
 
 // ─── IPC: config ─────────────────────────────────────────────────────────────
-ipcMain.handle('get-config', () => ({ ...CONFIG, QUEUE_IDS: getQueueIds() }));
+ipcMain.handle('get-config', () => createPublicConfig());
 ipcMain.handle('set-config', (_, newCfg) => { applyConfigPatch(newCfg); return true; });
 
 ipcMain.handle('pick-file', async (_, filters) => {
@@ -1110,6 +1255,7 @@ ipcMain.handle('test-genesys', async () => {
 
     return { ok: true, region, total, msg: `Conectado! ${total} e-mail(s) aguardando nas filas.` };
   } catch(e) {
+    appendAppLog('error', 'Falha ao testar Genesys', { error: e.message, region: CONFIG.ORG_REGION });
     return { ok: false, msg: e.message, region: CONFIG.ORG_REGION };
   }
 });
@@ -1142,13 +1288,13 @@ ipcMain.handle('stop-auto', () => {
 
 // ─── IPC: executar MesaDistribuicao.exe ──────────────────────────────────────
 ipcMain.handle('executar-mesa', async (_, csvPath) => {
-  const pyPath = path.join(__dirname, 'inputMesa', 'MesaDistribuicao.py');
-  const exePath = path.join(__dirname, 'inputMesa', 'MesaDistribuicao.exe');
-  const inputDir = path.join(__dirname, 'inputMesa');
+  const inputDir = ensureDir(getInputMesaDir());
+  const pyPath = path.join(inputDir, 'MesaDistribuicao.py');
+  const exePath = path.join(inputDir, 'MesaDistribuicao.exe');
   const usePy = fs.existsSync(pyPath);
 
   if (!usePy && !fs.existsSync(exePath)) {
-    return { ok: false, msg: 'MesaDistribuicao.py ou MesaDistribuicao.exe nao encontrado em inputMesa/' };
+    return { ok: false, msg: `MesaDistribuicao.py ou MesaDistribuicao.exe nao encontrado em ${inputDir}` };
   }
 
   // Copia CSV para inputMesa/
@@ -1180,8 +1326,10 @@ ipcMain.handle('executar-mesa', async (_, csvPath) => {
       const errOut = sanitizeProcessOutput(stderr || '');
       if (err) {
         const parts = [errOut || err.message, out].filter(Boolean);
+        appendAppLog('error', 'Falha ao executar subida da mesa', { error: err.message, inputDir });
         resolve({ ok: false, msg: parts.join('\n').trim() || err.message });
       } else {
+        appendAppLog('info', 'Subida da mesa concluida', { inputDir, runner: path.basename(usePy ? pyPath : exePath) });
         resolve({ ok: true, msg: out || `${path.basename(usePy ? pyPath : exePath)} concluido.` });
       }
     });
@@ -1190,6 +1338,7 @@ ipcMain.handle('executar-mesa', async (_, csvPath) => {
 
 // ─── IPC: abrir pasta output ──────────────────────────────────────────────────
 ipcMain.handle('open-output', (_, filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) return false;
   shell.showItemInFileExplorer(filePath);
   return true;
 });
@@ -1199,8 +1348,10 @@ ipcMain.handle('open-output', (_, filePath) => {
 ipcMain.handle('gerar-base', async (_, { filtros }) => {
   try {
     const resultado = await gerarBaseCompleta(filtros);
+    appendAppLog('info', 'Base CSV gerada', { outputPath: resultado.outputPath, total: resultado.total });
     return resultado;
   } catch(e) {
+    appendAppLog('error', 'Falha ao gerar base', { error: e.message });
     return { ok: false, msg: e.message, stack: e.stack };
   }
 });
@@ -1216,6 +1367,7 @@ ipcMain.handle('listar-mesa', async () => {
     const protocolos = new Set(resultado.records.map(r => r.protocolo).filter(Boolean));
     return { ...resultado, totalProtocolos: protocolos.size };
   } catch(e) {
+    appendAppLog('error', 'Falha ao listar mesa', { error: e.message });
     return { ok: false, msg: e.message };
   }
 });
@@ -1369,29 +1521,20 @@ ipcMain.handle('limpar-mesa', async (_, payload = {}) => {
 });
 
 ipcMain.handle('run-extraction', async (_, payload = {}) => {
-  if (extractionRunning) return { ok: false, msg: 'Ja existe uma extracao em andamento.' };
-
   const requested = Array.isArray(payload.ids) && payload.ids.length
     ? payload.ids
     : Object.keys(DEFAULT_EXTRACTION_SCRIPTS);
-  const ids = requested.filter(id => DEFAULT_EXTRACTION_SCRIPTS[id]);
+  const ids = [...new Set(requested.filter(id => DEFAULT_EXTRACTION_SCRIPTS[id]))].slice(0, 4);
 
   if (!ids.length) return { ok: false, msg: 'Nenhum script de extracao selecionado.' };
 
-  extractionRunning = true;
-  try {
-    const results = [];
-    for (const id of ids) {
-      results.push(await runExtractionScript(id));
-    }
-    return {
-      ok: results.every(r => r.ok),
-      results,
-      msg: `${results.filter(r => r.ok).length}/${results.length} extracao(oes) concluida(s) com sucesso.`,
-    };
-  } finally {
-    extractionRunning = false;
-  }
+  const results = await Promise.all(ids.map(id => runExtractionScriptTracked(id)));
+  const concluidas = results.filter(r => r.ok).length;
+  return {
+    ok: results.every(r => r.ok),
+    results,
+    msg: `${concluidas}/${results.length} extracao(oes) concluida(s) com sucesso.`,
+  };
 });
 
 function normProtocolo(val) {
@@ -1595,6 +1738,49 @@ function parseCsvLineSafe(line, sep = ';') {
   return cols;
 }
 
+function splitCsvRecordsSafe(text) {
+  const records = [];
+  let current = '';
+  let quoted = false;
+  const source = String(text || '').replace(/^\uFEFF/, '');
+
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '"') {
+      current += ch;
+      if (quoted && source[i + 1] === '"') {
+        current += source[i + 1];
+        i++;
+      } else {
+        quoted = !quoted;
+      }
+    } else if ((ch === '\n' || ch === '\r') && !quoted) {
+      if (ch === '\r' && source[i + 1] === '\n') i++;
+      if (current.trim() !== '') records.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+
+  if (current.trim() !== '') records.push(current);
+  return records;
+}
+
+function parseCsvRowsFromTextSafe(text, sep = ';') {
+  const records = splitCsvRecordsSafe(text);
+  if (records.length < 2) return [];
+  const headers = parseCsvLineSafe(records[0], sep).map(h => h.replace(/^\uFEFF/, '').trim());
+  return records.slice(1).map(record => {
+    const cols = parseCsvLineSafe(record, sep);
+    const obj = {};
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i]) obj[headers[i]] = cols[i] ? cols[i].trim() : '';
+    }
+    return obj;
+  });
+}
+
 function readTextFileSmartSafe(p) {
   const buf = fs.readFileSync(p);
   const utf = buf.toString('utf8');
@@ -1604,17 +1790,7 @@ function readTextFileSmartSafe(p) {
 
 function readCsvRowsSafe(p) {
   if (!safeExists(p)) return [];
-  const lines = readTextFileSmartSafe(p).split(/\r?\n/).filter(l => l.trim() !== '');
-  if (lines.length < 2) return [];
-  const headers = parseCsvLineSafe(lines[0]).map(h => h.replace(/^\uFEFF/, '').trim());
-  return lines.slice(1).map(line => {
-    const cols = parseCsvLineSafe(line);
-    const obj = {};
-    for (let i = 0; i < headers.length; i++) {
-      if (headers[i]) obj[headers[i]] = cols[i] ? cols[i].trim() : '';
-    }
-    return obj;
-  });
+  return parseCsvRowsFromTextSafe(readTextFileSmartSafe(p));
 }
 
 function toRegiaoMesa(empresa) {
@@ -1829,15 +2005,15 @@ async function gerarBaseCompleta(filtros = {}) {
         region: mesa.region,
       });
 
-      progress(1, `✅ ${protocolosNaMesa.size} protocolo(s) já na mesa — serão removidos da base.`);
+      progress(1, `${protocolosNaMesa.size} protocolo(s) ja na mesa; serao removidos da base.`);
 
     } catch(e) {
       mainWindow.webContents.send('genesys-status', { ok: false, msg: e.message });
-      progress(1, `⚠ Genesys: ${e.message}. Continuando sem filtro de duplicidade.`);
+      progress(1, `Aviso Genesys: ${e.message}. Continuando sem filtro de duplicidade.`);
     }
   } else {
     mainWindow.webContents.send('genesys-status', { ok: false, msg: 'Credenciais não configuradas' });
-    progress(1, '⚠ Credenciais Genesys não configuradas. Pulando verificação de duplicidade.');
+    progress(1, 'Credenciais Genesys nao configuradas. Pulando verificacao de duplicidade.');
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -1961,16 +2137,7 @@ async function gerarBaseCompleta(filtros = {}) {
 
   function lerCSV(p) {
     if(!fs.existsSync(p)) return [];
-    let lines=readTextFileSmart(p).split(/\r?\n/).filter(l=>l.trim()!=='');
-    if(lines.length<2) return [];
-    let headers=parseCsvLine(lines[0]).map(h=>h.replace(/^\uFEFF/,'').trim());
-    let result=[];
-    for(let i=1;i<lines.length;i++){
-      let cols=parseCsvLine(lines[i]); let obj={};
-      for(let j=0;j<headers.length;j++) if(headers[j]) obj[headers[j]]=cols[j]?cols[j].trim():'';
-      result.push(obj);
-    }
-    return result;
+    return parseCsvRowsFromTextSafe(readTextFileSmart(p));
   }
 
   // ── 2. Carregar priorização ───────────────────────────────────────────────
@@ -2160,7 +2327,7 @@ async function gerarBaseCompleta(filtros = {}) {
   // ── Processar XLS (Site Novo) ─────────────────────────────────────────────
   let totalXls = 0;
   for(let p of CONFIG.PATHS_XLS) {
-    if(!fs.existsSync(p)) { progress(3,`⚠ Não encontrado: ${path.basename(p)}`); continue; }
+    if(!fs.existsSync(p)) { progress(3,`Nao encontrado: ${path.basename(p)}`); continue; }
     const wb = xlsx.readFile(p);
     const data = xlsx.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { raw: true });
     totalXls += data.length;
@@ -2224,8 +2391,7 @@ async function gerarBaseCompleta(filtros = {}) {
   progress(4, 'Ordenando e gerando CSV…');
   rowsData.sort((a,b) => b.prioridade - a.prioridade);
 
-  const outputDir = path.join(__dirname, 'inputMesa');
-  if(!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+  const outputDir = ensureDir(getInputMesaDir());
   const outputPath = path.join(outputDir, 'mesa_distribuicao.csv');
 
   const outputRows = [

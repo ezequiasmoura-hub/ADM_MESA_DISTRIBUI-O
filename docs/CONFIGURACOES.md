@@ -1,22 +1,38 @@
 # Configuracoes
 
-Este documento explica as variaveis de ambiente e as configuracoes da tela **Configuracoes**.
+Este documento explica as variaveis de ambiente, configuracoes da tela e caminhos usados pela aplicacao.
 
-## Arquivos de configuracao
+## Fontes de configuracao
 
-A aplicacao carrega:
+A aplicacao carrega configuracoes nesta ordem:
 
 1. `.env` na raiz do projeto;
 2. `inputMesa/.env`;
-3. configuracoes salvas pela UI em `mesa_config.json` na pasta de dados do usuario do Electron.
+3. `mesa_config.json` salvo na pasta de dados do usuario do Electron;
+4. normalizacao interna em `main.js`.
 
-Use `.env.example` como modelo. Nao commite `.env`.
+No app empacotado, a pasta de dados do usuario e obtida com:
+
+```js
+app.getPath('userData')
+```
+
+## Arquivos sensiveis
+
+Nunca versionar:
+
+- `.env`;
+- `inputMesa/.env`;
+- `mesa_config.json` real;
+- logs;
+- CSVs e planilhas geradas;
+- tokens, secrets e senhas.
 
 ## Genesys
 
 ### `ORG_REGION`
 
-Chave do enum `PureCloudRegionHosts`.
+Regiao Genesys usada pelo SDK.
 
 Exemplo:
 
@@ -26,9 +42,7 @@ ORG_REGION=sa_east_1
 
 ### `CLIENT_ID`
 
-Client ID OAuth Client Credentials.
-
-Exemplo seguro:
+Client ID do OAuth Client Credentials.
 
 ```env
 CLIENT_ID=seu_client_id_oauth
@@ -36,33 +50,54 @@ CLIENT_ID=seu_client_id_oauth
 
 ### `CLIENT_SECRET`
 
-Client secret OAuth. Nunca versionar.
-
-Exemplo seguro:
+Client secret do OAuth. Nunca coloque valor real em documentacao ou commit.
 
 ```env
 CLIENT_SECRET=seu_client_secret_oauth
 ```
 
+Na UI, se o secret ja estiver salvo, o campo fica vazio com indicador de que existe valor configurado. Deixar vazio preserva o valor anterior.
+
 ### `QUEUE_ID` e `QUEUE_IDS`
 
-Filas monitoradas para consulta geral e deduplicacao.
-
-Exemplo:
+Filas usadas para consulta da mesa, deduplicacao e filtros.
 
 ```env
-QUEUE_IDS=queue-id-al,queue-id-go
+QUEUE_IDS=queue-id-1,queue-id-2
 ```
 
-`QUEUE_ID` singular tambem e aceito pelo codigo como fallback.
+`QUEUE_ID` singular e aceito como fallback.
+
+## Pastas locais
+
+### `INPUT_MESA_DIR`
+
+Pasta onde ficam o CSV final e o executor externo da subida.
+
+```env
+INPUT_MESA_DIR=C:\Caminho\Operacional\inputMesa
+```
+
+Se vazio:
+
+- em desenvolvimento: usa `inputMesa/` dentro do projeto;
+- no app empacotado: usa `app.getPath('userData')/inputMesa`.
+
+### `LOG_DIR`
+
+Pasta raiz dos logs.
+
+```env
+LOG_DIR=C:\Caminho\Operacional\logs
+```
+
+Se vazio, usa `app.getPath('userData')/logs`.
 
 ## Limpeza
 
 ### `CLEANUP_CONCURRENCY`
 
 Quantidade de conversas processadas em paralelo.
-
-Padrao:
 
 ```env
 CLEANUP_CONCURRENCY=10
@@ -72,61 +107,43 @@ Na UI aparece como **paralelo**.
 
 ### `CLEANUP_RATE_LIMIT_PER_MINUTE`
 
-Limite global de chamadas de limpeza iniciadas por minuto.
-
-Padrao:
+Limite global de requisicoes de limpeza iniciadas por minuto.
 
 ```env
 CLEANUP_RATE_LIMIT_PER_MINUTE=280
 ```
 
-A normalizacao atual limita o valor a `300`.
+Padrao: `280`. A normalizacao limita a no maximo `300`.
 
 ### `CLEANUP_RATE_LIMIT_FALLBACK_SECONDS`
 
-Tempo de espera quando a Genesys retorna `429` sem header `Retry-After`.
-
-Padrao:
+Tempo de espera quando a Genesys retorna `429` sem `Retry-After`.
 
 ```env
 CLEANUP_RATE_LIMIT_FALLBACK_SECONDS=30
 ```
 
-Na UI aparece como **429/s**.
-
 ### `CLEANUP_QUEUE_IDS`
 
-IDs de fila usados quando a limpeza estiver sem filtros ou apenas com filtro de estado.
-
-Exemplo:
+IDs de fila usados pela limpeza por estado/fila quando nao ha filtros detalhados.
 
 ```env
 CLEANUP_QUEUE_IDS=queue-id-al,queue-id-go
 ```
 
-Tambem pode ser configurado na UI, um ID por linha.
-
-### `CLEANUP_START_INTERVAL_MS`
-
-Configuracao legada ainda lida pelo codigo, mas a UI atual usa o rate limiter por minuto. Nao deve ser usada em operacao normal.
-
-## Consulta de protocolos da mesa
+Na UI, informe um ID por linha.
 
 ### `MESA_DETAIL_RETRIES`
 
-Quantidade de tentativas para leitura detalhada de conversa em rotinas que usam retry detalhado.
-
-Padrao:
+Tentativas de leitura detalhada de conversas.
 
 ```env
 MESA_DETAIL_RETRIES=30
 ```
 
-Valor `0` significa sem limite pratico, mas deve ser usado com cuidado.
-
 ### `MESA_DETAIL_RETRY_DELAY_MS`
 
-Espera entre tentativas detalhadas.
+Intervalo entre tentativas detalhadas.
 
 ```env
 MESA_DETAIL_RETRY_DELAY_MS=1500
@@ -134,7 +151,7 @@ MESA_DETAIL_RETRY_DELAY_MS=1500
 
 ### `MESA_PROTOCOL_CONCURRENCY`
 
-Concorrencia do fallback analitico individual quando a consulta em lote nao encontra protocolo.
+Concorrencia em consultas individuais de fallback.
 
 ```env
 MESA_PROTOCOL_CONCURRENCY=12
@@ -142,35 +159,31 @@ MESA_PROTOCOL_CONCURRENCY=12
 
 ### `MESA_PROTOCOL_INTERVAL_DAYS`
 
-Janela, em dias, usada nas consultas analiticas de detalhes.
+Janela maxima da consulta analitica individual.
 
 ```env
 MESA_PROTOCOL_INTERVAL_DAYS=30
 ```
 
-A normalizacao limita internamente a janela de consulta a ate 31 dias.
-
 ## Subida da mesa
 
-Essas variaveis sao passadas para `inputMesa/MesaDistribuicao.py` quando o app executa a subida.
+Essas variaveis sao passadas para `MesaDistribuicao.py` quando a UI executa a subida externa.
 
 ### `MESA_UPLOAD_STRATEGY`
-
-Estrategia:
-
-- `paced`: ritmo continuo;
-- `batch`: lotes;
-- `serial`: uma por vez.
-
-Padrao:
 
 ```env
 MESA_UPLOAD_STRATEGY=paced
 ```
 
+Valores:
+
+- `paced`;
+- `batch`;
+- `serial`.
+
 ### `MESA_UPLOAD_WORKERS`
 
-Quantidade de workers da subida.
+Quantidade de workers da subida externa.
 
 ```env
 MESA_UPLOAD_WORKERS=5
@@ -188,7 +201,7 @@ MESA_UPLOAD_INTERVAL_SECONDS=2
 
 ### `MESA_UPLOAD_BATCH_PAUSE_SECONDS`
 
-Pausa entre lotes no modo `batch`.
+Pausa entre lotes.
 
 ```env
 MESA_UPLOAD_BATCH_PAUSE_SECONDS=2
@@ -196,15 +209,13 @@ MESA_UPLOAD_BATCH_PAUSE_SECONDS=2
 
 ### `MESA_UPLOAD_TIMEOUT_MINUTES`
 
-Timeout do processo externo de subida. `0` significa sem timeout imposto pelo Electron.
+Timeout do processo externo. `0` significa sem timeout imposto pelo Electron.
 
 ```env
 MESA_UPLOAD_TIMEOUT_MINUTES=0
 ```
 
-## Retry do script Python de subida
-
-Essas variaveis sao usadas pelo `inputMesa/MesaDistribuicao.py`.
+### Variaveis do script Python
 
 ```env
 MESA_REQUEST_RETRIES=8
@@ -215,11 +226,11 @@ MESA_TOKEN_RETRY_SECONDS=15
 MESA_DRY_RUN=0
 ```
 
-`MESA_DRY_RUN=1` testa o script de subida sem criar conversas.
+`MESA_DRY_RUN=1` deve ser usado somente para diagnostico do script externo.
 
 ## Extracoes
 
-### Credenciais gerais
+### Credencial geral
 
 ```env
 EXTRACAO_USUARIO=usuario_exemplo
@@ -239,24 +250,22 @@ EXTRACAO_RS_USUARIO=usuario_rs
 EXTRACAO_RS_SENHA=senha_rs
 ```
 
-Se a credencial especifica existir, ela tem prioridade sobre a geral.
+A credencial especifica tem prioridade sobre a geral.
 
 ### `EXTRACAO_HEADLESS`
-
-Controla navegador visivel dos extratores.
 
 ```env
 EXTRACAO_HEADLESS=1
 ```
 
-Use `0` para abrir navegador visivel durante diagnostico.
+Use `0` para diagnostico com navegador visivel.
 
 ### `EXTRACAO_BASE_DIR`
 
-Pasta base onde os extratores salvam os arquivos.
+Pasta onde os extratores salvam bases.
 
 ```env
-EXTRACAO_BASE_DIR=H:\TEMOTEO - NAO ABRA\Base
+EXTRACAO_BASE_DIR=C:\Bases\Mesa
 ```
 
 ### Site Novo
@@ -268,10 +277,7 @@ EXTRACAO_SITE_NOVO_MAX_TENTATIVAS=3
 EXTRACAO_SITE_NOVO_START_DATE=2026-01-01
 ```
 
-- `CDP=1` conecta em navegador ja aberto na porta 9222.
-- `START_DATE` define inicio do periodo exportado.
-
-### Concorrencia HTTP dos extratores
+### Concorrencia dos extratores
 
 ```env
 EXTRACAO_ANTIGO_CONCORRENCIA=50
@@ -283,7 +289,7 @@ EXTRACAO_RS_CONCORRENCIA=100
 
 ### `NODE_BIN`
 
-Runtime usado para scripts Node.
+Runtime usado para scripts Node em desenvolvimento. No app empacotado, se vazio, a aplicacao usa o proprio executavel Electron com `ELECTRON_RUN_AS_NODE=1`.
 
 ```env
 NODE_BIN=node
@@ -299,51 +305,13 @@ PYTHON_BIN=python
 
 ## Configuracoes da tela
 
-### Interface
-
-- **Modo claro**: alterna tema claro/escuro.
-
-### Arquivo de priorizacao
-
-- Caminho da planilha `PRIORIZACAO_MESA_BKO.xlsx`.
-- A aba esperada e `CONSOLIDADO`.
-
-### Bases CSV
-
-- `EQTL_RS.csv`;
-- `EQTL_GO.csv`;
-- `bko_all.csv`.
-
-### Bases XLS Site Novo
-
-- `01_Todos_Aberto.xls`;
-- `02_Todos_Pendente.xls`.
-
-### Credenciais das extracoes
-
-Campos de usuario/senha para Site Novo, Site Antigo, GO e RS. Senha vazia na tela preserva a senha ja salva.
-
-### Genesys Cloud
-
-- `ORG_REGION`;
-- `CLIENT_ID`;
-- `CLIENT_SECRET`;
-- `QUEUE_IDs`;
-- IDs da mesa para limpeza;
-- teste de conexao.
-
-### Velocidade da limpeza
-
-- **paralelo** -> `CLEANUP_CONCURRENCY`;
-- **req/min** -> `CLEANUP_RATE_LIMIT_PER_MINUTE`;
-- **429/s** -> `CLEANUP_RATE_LIMIT_FALLBACK_SECONDS`.
-
-### Subida segura da mesa
-
-- estrategia;
-- workers;
-- intervalo;
-- timeout.
+- **Modo claro**: alterna tema.
+- **Pastas locais**: define `INPUT_MESA_DIR` e `LOG_DIR`.
+- **Bases**: caminhos das planilhas/CSVs usados para gerar a mesa.
+- **Credenciais de extracao**: usuario/senha por origem.
+- **Genesys Cloud**: regiao, client id, client secret e filas.
+- **Velocidade da limpeza**: paralelo, req/min e fallback 429.
+- **Subida segura da mesa**: estrategia, workers, intervalo e timeout.
 
 ## Exemplo seguro de `.env`
 
@@ -355,6 +323,8 @@ QUEUE_IDS=queue-id-exemplo-1,queue-id-exemplo-2
 CLEANUP_CONCURRENCY=10
 CLEANUP_RATE_LIMIT_PER_MINUTE=280
 CLEANUP_RATE_LIMIT_FALLBACK_SECONDS=30
+INPUT_MESA_DIR=
+LOG_DIR=
 EXTRACAO_USUARIO=usuario_exemplo
 EXTRACAO_SENHA=senha_exemplo
 EXTRACAO_HEADLESS=1

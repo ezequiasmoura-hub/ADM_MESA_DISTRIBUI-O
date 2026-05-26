@@ -1,12 +1,21 @@
 {
   "name": "mesa-distribuicao-bko",
+  "productName": "ADM Mesa de Distribuição",
   "version": "2.0.0",
-  "description": "Mesa de Distribuicao - Painel Backoffice",
+  "description": "ADM Mesa de Distribuicao - Painel desktop Backoffice",
   "main": "main.js",
+  "author": "BackOffice",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "smoke": "electron . --smoke-test",
+    "lint": "npm run check",
+    "test": "npm run check",
     "check": "node --check main.js && node --check preload.js && node --check scripts/extracao/shared.js && node --check scripts/extracao/site-novo.js && node --check scripts/extracao/site-antigo.js && node --check scripts/extracao/go.js && node --check scripts/extracao/rs.js",
+    "build": "npm run check && electron-builder --dir",
+    "dist": "npm run dist:win",
+    "dist:win": "npm run check && electron-builder --win --x64",
+    "dist:win:portable": "npm run check && electron-builder --win portable --x64",
     "extract:site-novo": "node scripts/extracao/site-novo.js",
     "extract:site-antigo": "node scripts/extracao/site-antigo.js",
     "extract:go": "node scripts/extracao/go.js",
@@ -22,6 +31,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^26.8.1"
   }
 }

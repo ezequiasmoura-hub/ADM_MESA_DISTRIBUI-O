@@ -1,65 +1,65 @@
-# Mesa de Distribuicao BKO
+# ADM Mesa de Distribuição
 
-Aplicacao Electron para geracao de base CSV e limpeza controlada da mesa de protocolos no Genesys Cloud. O projeto foi ajustado para operar em ambiente de producao com confirmacao explicita, logs, controle global de rate limit e cuidado para nao subir ou remover protocolos indevidamente.
+Aplicacao desktop Electron para gerar a base `mesa_distribuicao.csv`, consultar a mesa de protocolos no Genesys Cloud, remover duplicidades antes da insercao e executar limpeza controlada da mesa com rate limit, paralelismo e logs.
+
+O projeto foi preparado para empacotamento Windows com `electron-builder`, gerando instalador e versao portable em `.exe`.
 
 ## Objetivo
 
-O objetivo da aplicacao e apoiar a operacao da mesa de protocolos do BackOffice:
+- Gerar o CSV operacional no padrao da aba `MESA DE DISTRIBUICAO` do BI.
+- Consultar a mesa atual do Genesys antes de gerar a base e remover protocolos ja existentes.
+- Rodar os extratores Site Novo, Site Antigo, GO e RS/CEEE em JavaScript.
+- Permitir modo automatico: extrair bases, gerar CSV respeitando os filtros da tela e executar a subida externa da mesa.
+- Consultar e limpar conversas da mesa com confirmacao, controle de ritmo e auditoria.
 
-- gerar `inputMesa/mesa_distribuicao.csv` no padrao da aba `MESA DE DISTRIBUICAO` do BI;
-- aplicar filtros equivalentes aos usados na operacao;
-- consultar a mesa atual no Genesys para remover da base final protocolos que ja estao na mesa;
-- executar extracoes das bases de origem em JavaScript;
-- opcionalmente executar o processo externo de subida da mesa;
-- consultar e limpar conversas da mesa com filtros, confirmacao e auditoria.
-
-## Principais funcionalidades
+## Funcionalidades principais
 
 - Tela **Gerar Base** com filtros por estado, SLA, responsavel, origem/site, skill, tipo de servico e e-mail.
-- Botoes **todos** e **limpar** em cada filtro de tags da geracao.
-- Geracao do CSV fixo `inputMesa/mesa_distribuicao.csv`, com separador `;` e UTF-8 com BOM.
-- Deduplicacao contra a mesa atual do Genesys usando consulta rapida de protocolos.
-- Tela **Limpeza da Mesa** com consulta em tempo real, filtros multiselecao, tabela, selecao e confirmacao.
-- Limpeza por itens selecionados quando existem filtros detalhados.
-- Limpeza por ID de fila quando nao ha filtros ou quando ha somente filtro de estado.
-- Rate limiter global da limpeza, padrao `280` requisicoes/minuto e limite configuravel ate `300`.
-- Paralelismo configuravel da limpeza, padrao `10`.
+- Botoes **todos** e **limpar** nos filtros de multiselecao.
+- Cards de resumo da base e distribuicao por estado.
+- Geracao fixa de `mesa_distribuicao.csv`, com separador `;` e UTF-8 com BOM.
+- Deduplicacao contra protocolos ja presentes na mesa do Genesys.
+- Tela **Extrair Bases** com execucao individual ou concorrente dos quatro extratores.
+- Tela **Limpeza da Mesa** com filtros multiselecao, selecao manual e confirmacao.
+- Limpeza por itens selecionados ou, quando aplicavel, por ID de fila/estado.
+- Rate limiter global configuravel, padrao `280` requests/min e maximo operacional `300`.
+- Paralelismo configuravel, padrao `10`.
 - Retry automatico em `429`, respeitando `Retry-After` e fallback de `30` segundos.
-- Indicadores de limpeza: encontradas, processadas, sucesso, erro, pendentes, req/min e status.
-- Logs de limpeza em `logs/limpeza-mesa-AAAA-MM-DD.jsonl`.
-- Tela **Extrair Bases** para rodar Site Novo, Site Antigo, GO e RS/CEEE.
-- Tela **Modo Automatico** para rodar extracoes, gerar base com os filtros atuais e, se habilitado, subir a mesa.
-- Tela **Configuracoes** para caminhos, credenciais Genesys, credenciais de extracao, IDs de fila, tema, velocidade de limpeza e subida.
+- Logs locais de aplicacao, extracao e limpeza.
+- Modo claro/escuro.
+- Build Windows com instalador NSIS e portable `.exe`.
 
 ## Tecnologias
 
 - Electron 33
 - Node.js
-- JavaScript no processo principal, preload e interface
-- HTML/CSS/JavaScript sem framework de frontend
+- JavaScript, HTML e CSS sem framework de frontend
+- `electron-builder` para empacotamento Windows
 - `purecloud-platform-client-v2` para Genesys Cloud
-- `xlsx` para leitura de planilhas
-- `playwright` e `cheerio` nos extratores
-- Python somente para o script operacional externo `inputMesa/MesaDistribuicao.py`, quando existir
+- `playwright`, `cheerio` e `xlsx` nos extratores e tratamento de bases
+- `.env` e configuracao local em `app.getPath('userData')`
 
-## Estrutura de pastas
+## Estrutura
 
 ```text
 MESA AUTO/
-  main.js                    Processo principal: regras, Genesys, CSV, limpeza e extracoes
-  preload.js                 Ponte segura IPC entre UI e main process
-  index.html                 Interface Electron
+  main.js                    Processo principal Electron: API, CSV, limpeza, extracoes e build runtime
+  preload.js                 Bridge IPC segura para a interface
+  index.html                 Interface desktop
   package.json               Scripts npm e dependencias
-  package-lock.json          Lockfile
-  start.bat                  Atalho Windows para iniciar o app
-  .env.example               Modelo seguro de configuracao
-  .gitignore                 Regras para nao versionar dados sensiveis/gerados
-  docs/                      Documentacao do projeto
-  scripts/extracao/          Extratores oficiais em JavaScript
-  inputMesa/                 Arquivos operacionais locais da mesa
-  logs/                      Logs gerados localmente, nao versionados
-  legacy/                    Codigo antigo mantido como referencia
-  extracao/                  Material legado externo, nao usado pelo fluxo atual
+  package-lock.json          Lockfile npm
+  electron-builder.yml       Configuracao do instalador/portable Windows
+  .env.example               Modelo seguro de variaveis locais
+  .gitignore                 Arquivos sensiveis/gerados ignorados
+  assets/
+    icon.ico                 Icone da janela/build
+    icon.svg                 Fonte editavel do icone
+    logo.png                 Logo local
+  scripts/extracao/          Extratores Site Novo, Site Antigo, GO e RS
+  inputMesa/                 Pasta operacional local para CSV e executor externo
+  docs/                      Documentacao tecnica e operacional
+  legacy/                    Referencias antigas, fora do fluxo principal
+  extracao/                  Material legado, fora do fluxo principal
 ```
 
 ## Instalacao
@@ -67,10 +67,10 @@ MESA AUTO/
 Pre-requisitos:
 
 - Windows;
-- Node.js instalado;
-- acesso de rede aos sistemas de origem e ao Genesys;
-- credenciais OAuth Client Credentials do Genesys;
-- credenciais dos sites de extracao, quando for rodar extracoes.
+- Node.js e npm;
+- acesso de rede ao Genesys e aos sistemas de origem;
+- credenciais Genesys OAuth Client Credentials;
+- credenciais dos sites de extracao, quando necessario.
 
 Instale as dependencias:
 
@@ -80,139 +80,139 @@ npm install
 
 ## Configuracao
 
-Crie um arquivo `.env` na raiz do projeto, usando `.env.example` como base. O app tambem carrega `inputMesa/.env` como fallback.
+Copie `.env.example` para `.env` e preencha apenas localmente. O `.env` real nao deve ser commitado.
 
-Variaveis minimas para Genesys:
+Variaveis minimas:
 
 ```env
 ORG_REGION=sa_east_1
 CLIENT_ID=seu_client_id_oauth
 CLIENT_SECRET=seu_client_secret_oauth
-QUEUE_IDS=
+QUEUE_IDS=queue-id-1,queue-id-2
 CLEANUP_CONCURRENCY=10
 CLEANUP_RATE_LIMIT_PER_MINUTE=280
 CLEANUP_RATE_LIMIT_FALLBACK_SECONDS=30
 ```
 
-As demais configuracoes podem ser ajustadas na tela **Configuracoes**. O app salva configuracoes da interface em `mesa_config.json` dentro da pasta de dados do usuario do Electron, nao na raiz do projeto.
+A tela **Configuracoes** tambem permite ajustar:
 
-## Executar em desenvolvimento
+- credenciais Genesys;
+- credenciais dos extratores;
+- IDs de fila para consulta e limpeza;
+- pastas locais de `inputMesa` e logs;
+- rate limit, paralelismo e retry;
+- parametros da subida externa da mesa.
 
-```powershell
-npm start
-```
+O renderer nao recebe `CLIENT_SECRET` nem senhas ja salvas; ele recebe apenas indicadores como "secret configurado". Senhas vazias na tela preservam o valor salvo.
 
-Ou use:
+## Desenvolvimento
 
-```powershell
-.\start.bat
-```
-
-Validacao estatica:
+Validar sintaxe:
 
 ```powershell
 npm run check
 ```
 
-## Gerar executavel
+Abrir a aplicacao:
 
-O projeto ainda nao possui script de empacotamento configurado no `package.json`. Hoje o fluxo suportado e rodar via Electron (`npm start`) ou `start.bat`. Para empacotar o app como `.exe`, consulte [docs/BUILD_E_EXECUTAVEL.md](docs/BUILD_E_EXECUTAVEL.md). Esse documento marca o build como etapa pendente de configuracao e sugere o caminho com `electron-builder`.
+```powershell
+npm start
+```
 
-Importante: `inputMesa/MesaDistribuicao.exe` nao e o executavel da aplicacao Electron. Ele e o executor externo usado para subir o CSV na mesa quando a UI manda executar a subida.
+Smoke test:
+
+```powershell
+npm run smoke
+```
+
+## Build Windows
+
+Gerar pasta empacotada:
+
+```powershell
+npm run build
+```
+
+Gerar instalador e portable:
+
+```powershell
+npm run dist:win
+```
+
+Saidas principais:
+
+```text
+dist/win-unpacked/ADM Mesa de Distribuição.exe
+dist/ADM-Mesa-de-Distribuicao-2.0.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.0.0-Portable-x64.exe
+```
+
+Detalhes completos em [docs/BUILD_E_EXECUTAVEL.md](docs/BUILD_E_EXECUTAVEL.md).
 
 ## Como usar
 
-1. Abra o app com `npm start` ou `start.bat`.
-2. Acesse **Configuracoes** e confirme credenciais, regiao, filas e caminhos das bases.
-3. Se precisar atualizar bases, use **Extrair Bases** e rode os quatro scripts.
-4. Em **Gerar Base**, aplique os filtros e clique em **Gerar Agora**.
-5. Escolha o modo:
-   - **So CSV**: apenas gera `inputMesa/mesa_distribuicao.csv`;
-   - **CSV + Subir Mesa**: gera o CSV e executa `MesaDistribuicao.py` ou `MesaDistribuicao.exe`;
-   - **Tudo Automatico**: roda extracoes, gera base com os filtros atuais e pode subir a mesa.
-6. Para limpeza, abra **Limpeza da Mesa**, consulte a mesa, filtre, selecione e confirme.
-
-## Geracao do CSV
-
-O CSV final segue esta estrutura:
-
-```text
-Regiao;Nota;Conclusao_desejada;Mandante;Protocolo;Tipo_de_servico;Coluna;Dados;Skill;Fluxo;Prioridade;STATUS_PRAZO_MESA
-```
-
-Regras principais:
-
-- protocolo e normalizado para comparar base e Genesys;
-- o prazo considera D+1 util a partir da data de abertura;
-- os tipos removidos por padrao sao `Cadastro baixa renda`, `Cadastro de Comunicadores`, `Problemas com Login` e `Agencia Web`;
-- registros ja presentes na mesa sao removidos do CSV final;
-- a ordenacao final usa prioridade calculada por prazo, fonte, credenciado e planilha de priorizacao;
-- o arquivo e sempre salvo como `inputMesa/mesa_distribuicao.csv`.
+1. Abra a aplicacao.
+2. Acesse **Configuracoes** e valide credenciais, filas, caminhos e limites.
+3. Em **Extrair Bases**, rode os extratores necessarios ou os quatro em concorrencia.
+4. Em **Gerar Base**, aplique os filtros e gere o CSV.
+5. Confira os cards de resumo e de distribuicao por estado.
+6. Use **CSV + Subir Mesa** ou **Tudo Automatico** apenas quando os filtros e totais estiverem corretos.
+7. Em **Limpeza da Mesa**, consulte, filtre, selecione e confirme antes de limpar.
 
 ## Limpeza da mesa
 
-A limpeza nunca executa automaticamente ao abrir a tela. O usuario precisa clicar no botao de limpeza e confirmar a caixa exibida.
+A limpeza nunca roda automaticamente ao abrir a tela. O backend exige confirmacao com `LIMPAR`.
 
-Dois modos existem:
+Modos:
 
-- **Selecionados**: quando ha filtros detalhados, o app limpa somente os `conversationId` selecionados na tabela. Antes de desconectar, valida se eles ainda estao na mesa.
-- **Por ID da mesa**: quando nao ha filtros ou quando ha somente filtro de estado, o app consulta os `queueId` configurados em **IDs da mesa para limpeza** e limpa o resultado confirmado. Nesse modo, a selecao manual da tabela e ignorada e a confirmacao mostra total, estados e filas.
+- **Selecionados**: limpa somente os `conversationId` selecionados na tabela.
+- **Por fila/estado**: quando nao ha filtros ou ha somente filtro de estado, consulta os IDs de fila configurados para o estado e limpa o conjunto confirmado.
 
-Cada execucao gera log JSONL com filtros, IDs, protocolos conhecidos, quantidade removida, ignorados e falhas.
+O processo registra total encontrado, processadas, sucesso, erro, pendentes, status atual e pausas por rate limit.
 
 ## Rate limit, paralelismo e retry
 
-A limpeza usa dois controles separados:
+- `CLEANUP_CONCURRENCY`: conversas em processamento ao mesmo tempo.
+- `CLEANUP_RATE_LIMIT_PER_MINUTE`: chamadas de limpeza iniciadas por minuto.
+- `CLEANUP_RATE_LIMIT_FALLBACK_SECONDS`: espera padrao quando `Retry-After` nao vier.
 
-- **Paralelismo** (`CLEANUP_CONCURRENCY`): quantas conversas podem estar em processamento ao mesmo tempo.
-- **Rate limit global** (`CLEANUP_RATE_LIMIT_PER_MINUTE`): quantas chamadas totais de desconexao podem iniciar por minuto.
-
-Mesmo com paralelo `10`, o rate limiter global impede que a aplicacao passe do limite configurado. O padrao e `280 req/min`; o maximo configuravel pela normalizacao atual e `300 req/min`.
-
-Se a Genesys retornar `429`:
-
-1. a limpeza nao para;
-2. o app le o header `Retry-After`;
-3. se nao houver `Retry-After`, aguarda `CLEANUP_RATE_LIMIT_FALLBACK_SECONDS`;
-4. a tela mostra contagem regressiva;
-5. a fila continua do ponto atual.
-
-Erros transitorios `408`, `500`, `502`, `503` e `504` recebem retry curto por conversa antes de serem registrados como falha.
-
-## Variaveis de ambiente
-
-Consulte [docs/CONFIGURACOES.md](docs/CONFIGURACOES.md) para a lista completa. Nunca versionar `.env`, client secret, tokens, senhas ou logs com dados operacionais.
+Mesmo com paralelismo alto, o rate limiter global controla o ritmo total. Em `429`, a aplicacao pausa, mostra contagem regressiva, respeita `Retry-After` e continua a fila sem repetir conversas ja processadas.
 
 ## Seguranca
 
-- `.env` e `inputMesa/.env` ficam ignorados pelo Git.
-- Logs de extracao passam por sanitizacao para mascarar segredos conhecidos.
-- Logs de limpeza nao devem conter tokens.
-- `inputMesa/MesaDistribuicao.py` e `inputMesa/MesaDistribuicao.exe` sao tratados como artefatos locais sensiveis/operacionais e nao devem ser versionados enquanto contiverem credenciais ou logica privada.
-- Nao rode limpeza em producao sem conferir filtros, estados e total na confirmacao.
-- Nao use o codigo legado de `legacy/` para operacao real.
+- `contextIsolation: true`.
+- `nodeIntegration: false`.
+- IPC exposto somente via `preload.js`.
+- Bloqueio de novas janelas e navegacao externa.
+- Secrets nao sao enviados ao renderer.
+- `.env`, logs, CSVs, executaveis operacionais e scripts sensiveis ficam no `.gitignore`.
+- Logs passam por sanitizacao para evitar tokens e secrets.
+
+Leia tambem [docs/SEGURANCA.md](docs/SEGURANCA.md).
 
 ## Problemas conhecidos
 
-- O build `.exe` da aplicacao Electron ainda nao esta configurado no `package.json`.
-- O script externo `inputMesa/MesaDistribuicao.py`, quando presente, ainda usa credenciais internas e deve ser refatorado para `.env` antes de qualquer versionamento.
-- A limpeza mantem progresso em memoria durante a execucao; se o app for fechado, deve-se consultar a mesa novamente.
-- Os caminhos padrao de bases apontam para estrutura operacional local e devem ser ajustados na tela **Configuracoes** quando o ambiente mudar.
+- O build usa `asar: false` por compatibilidade com os scripts externos e Playwright. A evolucao recomendada e migrar para `asar: true` com `asarUnpack`.
+- Neste Windows, a edicao de recursos do executavel pelo `winCodeSign` falha sem privilegio de criar links simbolicos. Por isso `signAndEditExecutable: false` fica ativo. O app gera `.exe` funcional; para embutir icone/metadata no arquivo do executavel, use Windows Developer Mode ou terminal admin e remova esse fallback.
+- O script externo de subida (`MesaDistribuicao.py` ou `.exe`) e artefato operacional local; credenciais internas devem ser removidas antes de versionar.
+- Nao existe checkpoint persistente da limpeza se o app for fechado no meio da operacao.
 
 ## Proximos passos
 
-- Externalizar credenciais do script de subida para `.env` ou cofre seguro.
-- Configurar empacotamento oficial da aplicacao Electron.
-- Adicionar testes automatizados para geracao de CSV e rate limiter.
-- Criar validacao automatica contra uma exportacao BI de referencia.
-- Separar `main.js` em modulos menores quando houver janela para refatoracao segura.
+- Modularizar `main.js` em `src/services`, `src/config` e `src/utils`.
+- Ativar `asar` com unpack controlado.
+- Adicionar lint formal e testes automatizados para CSV, filtros e rate limiter.
+- Adotar armazenamento seguro para secrets, como Windows Credential Manager.
+- Assinar digitalmente o instalador em release oficial.
 
 ## Documentacao
 
 - [Manual do Usuario](docs/MANUAL_USUARIO.md)
 - [Documentacao Tecnica](docs/DOCUMENTACAO_TECNICA.md)
+- [Arquitetura Desktop](docs/ARQUITETURA_DESKTOP.md)
 - [Fluxo de Limpeza](docs/FLUXO_LIMPEZA.md)
 - [API Genesys](docs/API_GENESYS.md)
 - [Configuracoes](docs/CONFIGURACOES.md)
+- [Seguranca](docs/SEGURANCA.md)
 - [Build e Executavel](docs/BUILD_E_EXECUTAVEL.md)
 - [Changelog](docs/CHANGELOG.md)

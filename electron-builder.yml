@@ -1,0 +1,58 @@
+appId: br.com.backoffice.adm-mesa-distribuicao
+productName: ADM Mesa de Distribuição
+copyright: Copyright © 2026 BackOffice
+asar: false
+
+directories:
+  output: dist
+  buildResources: assets
+
+files:
+  - main.js
+  - preload.js
+  - index.html
+  - package.json
+  - scripts/**/*
+  - assets/**/*
+  - docs/**/*
+  - README.md
+  - "!**/.env"
+  - "!**/*.log"
+  - "!logs/**/*"
+  - "!inputMesa/**/*.csv"
+  - "!inputMesa/**/*.xlsx"
+  - "!inputMesa/**/*.xls"
+  - "!inputMesa/MesaDistribuicao.py"
+  - "!inputMesa/MesaDistribuicao.exe"
+  - "!extracao/**/*"
+  - "!legacy/**/*"
+
+extraResources:
+  - from: inputMesa/RODARMESA.bat
+    to: inputMesa/RODARMESA.bat
+    filter:
+      - "**/*"
+
+win:
+  icon: assets/icon.ico
+  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  artifactName: ADM-Mesa-de-Distribuicao-${version}-Setup-${arch}.${ext}
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ADM Mesa de Distribuição
+
+portable:
+  artifactName: ADM-Mesa-de-Distribuicao-${version}-Portable-${arch}.${ext}

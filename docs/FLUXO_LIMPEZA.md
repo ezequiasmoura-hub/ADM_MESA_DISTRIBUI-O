@@ -178,7 +178,7 @@ Se o app for fechado, nao existe checkpoint persistido. A operacao segura e cons
 Cada limpeza grava um JSON por linha em:
 
 ```text
-logs/limpeza-mesa-AAAA-MM-DD.jsonl
+<pasta-de-logs>/limpeza-mesa-AAAA-MM-DD.jsonl
 ```
 
 Campos principais:

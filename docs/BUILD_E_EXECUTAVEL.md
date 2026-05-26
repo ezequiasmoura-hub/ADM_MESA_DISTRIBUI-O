@@ -1,35 +1,43 @@
-# Build e Executavel
+# Build e Executavel Windows
 
-Este documento explica o estado atual do build e como preparar a geracao de `.exe`.
+Este projeto esta configurado para gerar uma aplicacao desktop Windows com Electron e `electron-builder`.
 
-## Estado atual
+## Diagnostico do build
 
-O projeto roda em desenvolvimento com Electron:
-
-```powershell
-npm start
-```
-
-O `package.json` atual nao possui script de empacotamento (`build`, `dist` ou `make`) e nao possui `electron-builder` instalado. Portanto, a geracao do `.exe` da aplicacao Electron ainda e uma etapa pendente de configuracao.
-
-Importante:
-
-- `inputMesa/MesaDistribuicao.exe` e o executor externo da subida da mesa.
-- Ele nao e o executavel da aplicacao Electron.
+- A aplicacao ja usa Electron (`main.js`, `preload.js`, `index.html`).
+- O empacotador escolhido foi `electron-builder`, por ser direto para instalador NSIS, portable `.exe`, icone, recursos extras e automacao via `package.json`.
+- A saida atual gera:
+  - app unpacked em `dist/win-unpacked/`;
+  - instalador em `dist/ADM-Mesa-de-Distribuicao-2.0.0-Setup-x64.exe`;
+  - portable em `dist/ADM-Mesa-de-Distribuicao-2.0.0-Portable-x64.exe`.
 
 ## Pre-requisitos
 
-- Windows;
-- Node.js;
-- npm;
-- dependencias instaladas com `npm install`;
-- credenciais e caminhos configurados;
-- Git, se o objetivo for versionar ou gerar release a partir de repositorio.
+- Windows 10/11;
+- Node.js e npm;
+- acesso de internet para baixar dependencias e binarios do Electron na primeira execucao;
+- Git, se for versionar releases;
+- permissao de rede aos sistemas de extracao e Genesys para testes funcionais.
 
 ## Instalar dependencias
 
 ```powershell
 npm install
+```
+
+## Scripts disponiveis
+
+```powershell
+npm start              # abre o app em desenvolvimento
+npm run dev            # abre em modo dev
+npm run smoke          # abre e fecha automaticamente para validar inicializacao
+npm run check          # valida sintaxe JS dos arquivos principais
+npm run lint           # alias de check
+npm test               # alias de check
+npm run build          # gera dist/win-unpacked
+npm run dist           # alias de dist:win
+npm run dist:win       # gera instalador NSIS e portable
+npm run dist:win:portable
 ```
 
 ## Rodar em desenvolvimento
@@ -38,7 +46,7 @@ npm install
 npm start
 ```
 
-ou:
+Ou:
 
 ```powershell
 .\start.bat
@@ -48,162 +56,221 @@ ou:
 
 ```powershell
 npm run check
+npm run smoke
 ```
 
-Tambem recomenda-se testar:
+Validacoes manuais recomendadas:
 
-- abrir a aplicacao;
-- salvar configuracoes;
+- abrir a tela **Configuracoes**;
 - testar conexao Genesys;
-- gerar CSV em **So CSV**;
-- consultar a aba de limpeza sem executar limpeza real;
-- testar extracoes em ambiente controlado.
+- consultar a mesa sem limpar;
+- gerar CSV em modo seguro;
+- rodar ao menos um extrator em ambiente controlado;
+- confirmar que `.env` nao aparece no Git.
 
-## Configuracao recomendada para gerar `.exe`
-
-Como ainda nao ha empacotador no projeto, uma opcao comum e adicionar `electron-builder`.
-
-Instalacao sugerida:
-
-```powershell
-npm install --save-dev electron-builder
-```
-
-Adicionar ao `package.json`:
-
-```json
-{
-  "scripts": {
-    "build": "electron-builder --win --x64"
-  },
-  "build": {
-    "appId": "br.com.equatorial.mesa-distribuicao-bko",
-    "productName": "Mesa de Distribuicao BKO",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "index.html",
-      "package.json",
-      "scripts/**/*",
-      "inputMesa/RODARMESA.bat"
-    ],
-    "win": {
-      "target": "nsis"
-    }
-  }
-}
-```
-
-Esse bloco e uma sugestao tecnica. Antes de empacotar, decidir se `inputMesa/MesaDistribuicao.exe` e `inputMesa/MesaDistribuicao.py` entram no pacote. Como esses arquivos podem conter credenciais ou logica operacional sensivel, o recomendado e nao empacotar ate externalizar as credenciais.
-
-## Comando de build apos configurar
-
-Depois de instalar e configurar o empacotador:
+## Gerar app unpacked
 
 ```powershell
 npm run build
 ```
 
-ou diretamente:
-
-```powershell
-npx electron-builder --win --x64
-```
-
-## Onde o executavel seria gerado
-
-Com `electron-builder`, a saida padrao configurada acima seria:
+Saida:
 
 ```text
-dist/
+dist/win-unpacked/ADM Mesa de Distribuição.exe
 ```
 
-Normalmente o instalador `.exe` fica dentro de `dist/`.
+Esse formato e bom para teste local porque preserva a pasta completa do app.
 
-## Como testar o executavel
+## Gerar instalador e portable
 
-1. Instalar/abrir o `.exe` gerado.
-2. Configurar credenciais pela tela.
-3. Confirmar se `mesa_config.json` e salvo na pasta de dados do usuario.
-4. Testar conexao Genesys.
-5. Gerar CSV em modo **So CSV**.
-6. Verificar se `inputMesa/mesa_distribuicao.csv` e criado no local esperado do app empacotado.
-7. Testar leitura dos scripts de extracao empacotados.
-8. Testar limpeza apenas com consulta, sem executar limpeza real.
+```powershell
+npm run dist:win
+```
+
+Saidas:
+
+```text
+dist/ADM-Mesa-de-Distribuicao-2.0.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.0.0-Portable-x64.exe
+```
+
+O instalador cria atalhos e pode permitir escolha de pasta. O portable e melhor para teste rapido ou operacao sem instalacao formal.
+
+## Configuracao do electron-builder
+
+A configuracao fica em `electron-builder.yml`:
+
+- `appId`: `br.com.backoffice.adm-mesa-distribuicao`;
+- `productName`: `ADM Mesa de Distribuição`;
+- saida em `dist/`;
+- recursos em `assets/`;
+- targets Windows `nsis` e `portable`;
+- icone base em `assets/icon.ico`;
+- exclusao de `.env`, logs, CSVs, planilhas, executaveis operacionais e arquivos sensiveis de `inputMesa`.
+
+## Sobre `asar`
+
+Atualmente:
+
+```yaml
+asar: false
+```
+
+Motivo: os extratores JavaScript, Playwright e execucoes externas precisam de caminhos simples no pacote. Para uma release mais madura, o recomendado e migrar para:
+
+```yaml
+asar: true
+asarUnpack:
+  - scripts/extracao/**/*
+  - node_modules/playwright/**/*
+```
+
+Essa migracao deve ser testada com todos os extratores antes de publicar.
+
+## Icone
+
+Arquivos atuais:
+
+```text
+assets/icon.ico
+assets/icon.svg
+assets/logo.png
+```
+
+O `main.js` usa `assets/icon.ico` como icone da janela. O `electron-builder.yml` tambem aponta para esse arquivo.
+
+Neste ambiente Windows, a etapa de edicao de recursos do executavel falhou ao extrair `winCodeSign` porque o usuario nao tem privilegio de criar links simbolicos. Para manter o build funcional, foi configurado:
+
+```yaml
+win:
+  signAndEditExecutable: false
+```
+
+Com isso o `.exe` e gerado e testado, mas a edicao de metadata/icone no arquivo do executavel pode ficar limitada. Para release final com icone embutido no arquivo:
+
+1. habilite **Developer Mode** no Windows ou rode o terminal como administrador;
+2. remova `signAndEditExecutable: false`;
+3. rode `npm run dist:win`;
+4. confira o icone no arquivo gerado.
+
+## Teste do executavel
+
+Depois do build:
+
+```powershell
+& ".\dist\win-unpacked\ADM Mesa de Distribuição.exe" --smoke-test
+```
+
+Tambem teste manualmente:
+
+- abrir o instalador;
+- abrir o portable;
+- configurar pastas locais;
+- gerar CSV;
+- consultar Genesys;
+- nao executar limpeza real sem conferencia operacional.
+
+## Arquivos incluidos e excluidos
+
+Incluidos:
+
+- `main.js`;
+- `preload.js`;
+- `index.html`;
+- `package.json`;
+- `scripts/**/*`;
+- `assets/**/*`;
+- `docs/**/*`;
+- `README.md`;
+- `inputMesa/RODARMESA.bat` como recurso extra.
+
+Excluidos:
+
+- `.env`;
+- logs;
+- CSVs e planilhas de `inputMesa`;
+- `inputMesa/MesaDistribuicao.py`;
+- `inputMesa/MesaDistribuicao.exe`;
+- `extracao/`;
+- `legacy/`.
+
+## Caminhos no app empacotado
+
+No desenvolvimento, `inputMesa` padrao fica na pasta do projeto.
+
+No app empacotado, se `INPUT_MESA_DIR` nao for informado, o app usa:
+
+```text
+%APPDATA%/ADM Mesa de Distribuição/inputMesa
+```
+
+Logs, por padrao:
+
+```text
+%APPDATA%/ADM Mesa de Distribuição/logs
+```
+
+Esses caminhos podem ser alterados na tela **Configuracoes**.
 
 ## Problemas comuns
 
 ### `electron-builder` nao encontrado
 
-Instale:
+```powershell
+npm install
+```
+
+### Erro de symlink no `winCodeSign`
+
+Mensagem parecida:
+
+```text
+Cannot create symbolic link ... libcrypto.dylib
+```
+
+Solucoes:
+
+- manter `signAndEditExecutable: false` para gerar `.exe` funcional;
+- ou habilitar Windows Developer Mode/admin e remover o fallback.
+
+### Playwright nao encontra navegador
+
+Rode:
 
 ```powershell
-npm install --save-dev electron-builder
+npx playwright install chromium
 ```
 
-### Arquivos nao encontrados no app empacotado
+Depois gere o build novamente.
 
-Revisar a lista `files` da configuracao de build e os caminhos relativos usados em `main.js`.
+### Arquivo operacional nao encontrado
 
-### Scripts de extracao nao rodam
+Confirme na tela **Configuracoes** a pasta `INPUT_MESA_DIR`. O app procura `MesaDistribuicao.py`, `MesaDistribuicao.exe` e `mesa_distribuicao.csv` nessa pasta.
 
-Verificar:
+### Credenciais nao carregam
 
-- se `scripts/extracao/` foi incluido no pacote;
-- se `NODE_BIN` aponta para runtime valido;
-- se as credenciais estao no `.env` ou salvas pela UI;
-- se o navegador do Playwright foi empacotado/instalado corretamente.
+Verifique:
 
-### `MesaDistribuicao.py` ou `.exe` nao encontrado
+- `.env` local;
+- campos salvos pela UI;
+- se voce deixou senha vazia para preservar senha anterior;
+- se `.env` nao foi movido para dentro do pacote.
 
-O app procura em:
+## Publicacao de nova versao
 
-```text
-inputMesa/MesaDistribuicao.py
-inputMesa/MesaDistribuicao.exe
-```
+1. Atualize `version` em `package.json`.
+2. Atualize `docs/CHANGELOG.md`.
+3. Rode `npm run check`.
+4. Rode `npm run smoke`.
+5. Rode `npm run dist:win`.
+6. Teste `Setup` e `Portable`.
+7. Gere commit e tag de release.
 
-No pacote final, decidir se esses arquivos serao distribuidos junto da aplicacao ou mantidos em uma pasta externa operacional.
+## Resultado validado nesta preparacao
 
-### Erro de encoding no Python
-
-O app ja injeta:
-
-```env
-PYTHONIOENCODING=utf-8
-PYTHONUTF8=1
-```
-
-Se persistir, validar a instalacao do Python e a codificacao do console.
-
-## Icone/capa do executavel
-
-O `main.js` tenta usar:
-
-```text
-icon.png
-```
-
-na raiz do projeto. Se for usar `electron-builder`, configure tambem:
-
-```json
-"win": {
-  "icon": "icon.ico",
-  "target": "nsis"
-}
-```
-
-Atualmente nao foi identificado `icon.png` ou `icon.ico` na raiz durante a revisao. Isso deve ser criado antes de um build final com identidade visual.
-
-## Cuidados antes de distribuir
-
-- Nao incluir `.env`.
-- Nao incluir logs.
-- Nao incluir CSVs gerados.
-- Nao incluir scripts com client secret embutido.
-- Testar em maquina limpa.
-- Validar que a limpeza exige confirmacao.
-- Validar `CLEANUP_RATE_LIMIT_PER_MINUTE`.
+- `npm run check`: OK.
+- `npm run smoke`: OK.
+- `npm run build`: OK com `signAndEditExecutable: false`.
+- `npm run dist:win`: OK, gerando instalador e portable.
+- Smoke test do executavel empacotado: OK.

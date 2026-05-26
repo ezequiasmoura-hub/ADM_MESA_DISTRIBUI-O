@@ -5,6 +5,7 @@ Este arquivo foi mantido como entrada curta para compatibilidade com a documenta
 A documentacao tecnica completa e atual esta em:
 
 - [DOCUMENTACAO_TECNICA.md](DOCUMENTACAO_TECNICA.md)
+- [ARQUITETURA_DESKTOP.md](ARQUITETURA_DESKTOP.md)
 - [FLUXO_LIMPEZA.md](FLUXO_LIMPEZA.md)
 - [API_GENESYS.md](API_GENESYS.md)
 

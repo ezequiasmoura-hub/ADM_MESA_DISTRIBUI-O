@@ -57,7 +57,7 @@ Existem quatro botoes individuais:
 - **GO**;
 - **RS / CEEE**.
 
-Tambem existe o botao **Rodar 4 scripts**, que executa todos em sequencia. Se um script falhar, a tela mostra o erro e o log fica em `logs/extracoes/`.
+Tambem existe o botao **Rodar 4 scripts**, que dispara os quatro extratores em concorrencia. Cada card mostra seu proprio andamento. Se um script falhar, a tela mostra o erro e o log fica na pasta de logs configurada em **Configuracoes**, dentro de `extracoes/`.
 
 ## Gerar a base CSV
 
@@ -180,7 +180,7 @@ Significados:
 ## O que fazer em caso de erro
 
 1. Leia a mensagem na tela.
-2. Consulte o log em `logs/limpeza-mesa-AAAA-MM-DD.jsonl`.
+2. Consulte o log `limpeza-mesa-AAAA-MM-DD.jsonl` na pasta de logs configurada.
 3. Atualize a mesa e veja se a conversa ainda aparece.
 4. Se houver muitos erros `429`, reduza `req/min` para um valor menor, como `250`.
 5. Se houver erro de credencial, teste a conexao em **Configuracoes**.

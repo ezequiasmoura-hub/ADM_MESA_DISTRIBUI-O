@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.0.1 - 2026-05-26
+
+### Alteracoes
+
+- Configurado empacotamento Windows com `electron-builder`.
+- Adicionados targets NSIS e portable.
+- Adicionados scripts `build`, `dist`, `dist:win`, `dist:win:portable`, `smoke`, `lint` e `test`.
+- Adicionados `assets/icon.ico`, `assets/logo.png` e `assets/icon.svg`.
+- Adicionados caminhos configuraveis `INPUT_MESA_DIR` e `LOG_DIR`.
+- Logs passaram a usar pasta adequada para app desktop quando empacotado.
+- Configuracao publica enviada ao renderer agora omite `CLIENT_SECRET` e senhas salvas.
+- Extratores passam a usar o runtime do proprio Electron empacotado quando `NODE_BIN` nao estiver configurado.
+- Criadas documentacoes `ARQUITETURA_DESKTOP.md` e `SEGURANCA.md`.
+
+### Correcoes
+
+- Evitado envio de secrets para a interface.
+- Bloqueadas novas janelas e navegacao externa no Electron.
+- Separados os nomes dos artefatos de instalador e portable.
+
+### Observacoes
+
+- `signAndEditExecutable: false` foi mantido porque este Windows nao possui privilegio para criar symlinks durante a extracao do `winCodeSign`.
+- `asar: false` permanece por compatibilidade com extratores e Playwright ate validacao de `asarUnpack`.
+
 ## 2.0.0 - 2026-05-25
 
 ### Alteracoes

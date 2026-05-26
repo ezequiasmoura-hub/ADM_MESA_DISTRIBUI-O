@@ -16,6 +16,6 @@ Resumo seguro:
 4. Gere o CSV pela aba **Gerar Base**.
 5. Use **Limpeza da Mesa** somente apos conferir filtros, total e estados.
 6. Se aparecer rate limit, aguarde a contagem regressiva; a aplicacao continua automaticamente.
-7. Consulte logs em `logs/`.
+7. Consulte logs na pasta configurada em **Configuracoes**.
 
 Nunca execute limpeza sem conferir a confirmacao exibida pela aplicacao.
