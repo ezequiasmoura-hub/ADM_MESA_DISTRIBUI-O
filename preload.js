@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   openOutput:   (filePath) => ipcRenderer.invoke('open-output', filePath),
   listarMesa:   ()         => ipcRenderer.invoke('listar-mesa'),
   limparMesa:   (payload)  => ipcRenderer.invoke('limpar-mesa', payload),
+  previewTratadosFora: ()  => ipcRenderer.invoke('preview-tratados-fora'),
   runExtracao:  (payload)  => ipcRenderer.invoke('run-extraction', payload),
 
   // Genesys

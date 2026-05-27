@@ -768,6 +768,7 @@ async function consultarMesaGenesys({ includeDetails = true, protocolOnly = fals
     total: records.length,
     records,
     totalEnriquecidosOrigem: sourceEnrichment.matched,
+    totalBaseOrigem: sourceEnrichment.totalBase,
     enrichmentErrors: sourceEnrichment.errors,
   };
 }
@@ -807,6 +808,11 @@ function appendCleanupLog(entry) {
   const logPath = path.join(logDir, `limpeza-mesa-${day}.jsonl`);
   fs.appendFileSync(logPath, JSON.stringify(entry) + '\n', 'utf8');
   return logPath;
+}
+
+function isBiMesaExcludedService(servico) {
+  const key = normalizeKeyName(servico);
+  return !!key && BI_MESA_EXCLUDED_SERVICES.some(ex => normalizeKeyName(ex) === key);
 }
 
 function appendAppLog(level, msg, details = {}) {
@@ -1430,6 +1436,67 @@ ipcMain.handle('listar-mesa', async () => {
   }
 });
 
+ipcMain.handle('preview-tratados-fora', async () => {
+  try {
+    const progresso = [];
+    const mesa = await consultarMesaGenesys({
+      includeDetails: true,
+      onProgress: msg => progresso.push(msg),
+    });
+    const errors = mesa.enrichmentErrors || [];
+    const totalBase = Number(mesa.totalBaseOrigem || 0);
+    const candidatos = [];
+    let semProtocolo = 0;
+    let aindaNaBase = 0;
+
+    for (const record of mesa.records || []) {
+      const protocolo = normProtocolo(record.protocolo);
+      if (!protocolo) {
+        semProtocolo++;
+        continue;
+      }
+      const sourceEligible = record.sourceMatched && !isBiMesaExcludedService(record.tipoServico);
+      if (sourceEligible) {
+        aindaNaBase++;
+        continue;
+      }
+      candidatos.push({
+        ...record,
+        protocolo,
+        motivoTratadoFora: record.sourceMatched
+          ? 'Tipo de servico excluido da base de distribuicao'
+          : 'Protocolo nao encontrado nas bases de origem configuradas',
+      });
+    }
+
+    appendAppLog('info', 'Preview tratados fora concluido', {
+      totalMesa: mesa.records?.length || 0,
+      totalBase,
+      candidatos: candidatos.length,
+      semProtocolo,
+      aindaNaBase,
+      errors,
+    });
+
+    return {
+      ok: true,
+      totalMesa: mesa.records?.length || 0,
+      totalBase,
+      totalTratadosFora: candidatos.length,
+      semProtocolo,
+      aindaNaBase,
+      records: mesa.records || [],
+      candidatos,
+      errors,
+      progresso,
+      msg: `${candidatos.length} conversa(s) na mesa nao aparecem nas bases atuais.`,
+    };
+  } catch (e) {
+    appendAppLog('error', 'Falha no preview de tratados fora', { error: e.message });
+    return { ok: false, msg: e.message };
+  }
+});
+
 ipcMain.handle('limpar-mesa', async (_, payload = {}) => {
   const dryRun = payload.dryRun === true;
   const filtros = payload.filtros || {};
@@ -2000,6 +2067,7 @@ function mergeMesaRecordFromSource(record, source) {
     fluxo: source.fluxo || record.fluxo || '',
     prioridade: source.prioridade || record.prioridade || '',
     conclusaoDesejada: source.conclusaoDesejada || record.conclusaoDesejada || '',
+    sourceMatched: true,
   };
   if (merged.error && merged.tipoServico && merged.prazo) {
     merged.detailError = merged.error;
@@ -2009,7 +2077,7 @@ function mergeMesaRecordFromSource(record, source) {
 }
 
 function enrichMesaRecordsWithSourceData(records, onProgress = null) {
-  if (!records.length) return { records, matched: 0, errors: [] };
+  if (!records.length) return { records, matched: 0, errors: [], totalBase: 0 };
   if (onProgress) onProgress('Cruzando protocolos da mesa com as bases de origem para preencher tipo e prazo...');
   const { index, errors } = buildMesaSourceEnrichmentIndex(onProgress);
   let matched = 0;
@@ -2019,7 +2087,7 @@ function enrichMesaRecordsWithSourceData(records, onProgress = null) {
     matched++;
     return mergeMesaRecordFromSource(record, source);
   });
-  return { records: enriched, matched, errors };
+  return { records: enriched, matched, errors, totalBase: index.size };
 }
 
 async function gerarBaseCompleta(filtros = {}) {

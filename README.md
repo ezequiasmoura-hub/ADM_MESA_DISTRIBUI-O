@@ -22,6 +22,7 @@ O projeto foi preparado para empacotamento Windows com `electron-builder`, geran
 - Tela **Extrair Bases** com execucao individual ou concorrente dos quatro extratores.
 - Caminhos dos extratores configuraveis na tela **Extrair Bases**, permitindo apontar para scripts `.js` externos sem refazer o build.
 - Tela **Limpeza da Mesa** com filtros multiselecao, selecao manual e confirmacao.
+- Acao **Limpar tratados fora** para remover da mesa protocolos que nao existem mais ou nao entram nas bases de origem atuais.
 - Limpeza por itens selecionados ou, quando aplicavel, por ID de fila/estado.
 - Rate limiter global configuravel, padrao `280` requests/min e maximo operacional `300`.
 - Paralelismo configuravel, padrao `10`.
@@ -147,8 +148,8 @@ Saidas principais:
 
 ```text
 dist/win-unpacked/ADM Mesa de Distribuição.exe
-dist/ADM-Mesa-de-Distribuicao-2.1.0-Setup-x64.exe
-dist/ADM-Mesa-de-Distribuicao-2.1.0-Portable-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.2.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.2.0-Portable-x64.exe
 ```
 
 Detalhes completos em [docs/BUILD_E_EXECUTAVEL.md](docs/BUILD_E_EXECUTAVEL.md).

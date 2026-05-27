@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.0 - 2026-05-27
+
+### Alteracoes
+
+- Adicionada acao **Limpar tratados fora** na aba **Limpeza da Mesa**.
+- A acao consulta a mesa, cruza com as bases de origem configuradas e seleciona apenas protocolos que nao existem mais na base.
+- Protocolos sem identificacao sao ignorados por seguranca.
+- A limpeza continua exigindo confirmacao antes de desconectar conversas.
+
 ## 2.1.0 - 2026-05-27
 
 ### Alteracoes

@@ -47,6 +47,20 @@ Depois, tenta preencher:
 
 Quando os detalhes do Genesys nao trazem tudo, a aplicacao cruza os protocolos com as bases locais para enriquecer a tabela.
 
+## Limpar tratados fora
+
+A acao **Limpar tratados fora** consulta a mesa e cruza os protocolos atuais com as bases de origem configuradas.
+
+Regras:
+
+- somente protocolos identificados entram na comparacao;
+- protocolos sem numero sao ignorados;
+- se o protocolo ainda existir nas bases atuais e for elegivel para a base de distribuicao, ele nao e limpo;
+- se o protocolo esta na mesa e nao existe nas bases atuais, ele entra como candidato;
+- se o protocolo existe na origem, mas pertence a tipo de servico excluido da base de distribuicao, ele tambem entra como candidato;
+- antes da limpeza real, a aplicacao mostra total, estados e pede confirmacao;
+- a desconexao usa o mesmo fluxo seguro de limpeza por itens selecionados.
+
 ## Filtros
 
 Filtros disponiveis:

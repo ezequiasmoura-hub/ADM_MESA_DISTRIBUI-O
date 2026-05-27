@@ -1353,6 +1353,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           <button class="btn btn-ghost btn-sm" onclick="limparFiltrosLimpeza()">Limpar filtros</button>
           <button class="btn btn-ghost btn-sm" onclick="selecionarFiltrados(true)">Selecionar filtrados</button>
           <button class="btn btn-ghost btn-sm" onclick="selecionarFiltrados(false)">Limpar selecao</button>
+          <button class="btn btn-danger btn-sm" onclick="limparTratadosFora()">Limpar tratados fora</button>
           <span style="font-size:10px;color:var(--text3);font-family:var(--mono)">A limpeza remove somente os itens selecionados na tabela.</span>
         </div>
 
@@ -2157,6 +2158,96 @@ function selecionarFiltrados(on) {
 function selectedLimpezaRecords() {
   const ids = new Set(selectedLimpezaIds());
   return S.limpeza.records.filter(r => ids.has(r.conversationId));
+}
+
+async function limparTratadosFora() {
+  setProcessStatus('run', 'Comparando mesa com bases atuais...');
+  logLimpeza('Iniciando comparacao: protocolos na mesa que nao existem ou nao entram nas bases atuais.');
+
+  try {
+    const preview = await api.previewTratadosFora();
+    if (!preview.ok) throw new Error(preview.msg || 'Falha ao comparar mesa e base.');
+
+    S.limpeza.loaded = true;
+    S.limpeza.records = preview.records || [];
+    const candidatos = preview.candidatos || [];
+    S.limpeza.selected = new Set(candidatos.map(r => r.conversationId).filter(Boolean));
+    populateCleanupFilters(S.limpeza.records);
+    aplicarFiltrosLimpeza(false);
+
+    const resumo = resumoEstadosLimpeza(candidatos);
+    const aviso = [
+      `Mesa consultada: ${fmtN(preview.totalMesa || 0)} conversa(s).`,
+      `Protocolos nas bases atuais: ${fmtN(preview.totalBase || 0)}.`,
+      `Tratados fora encontrados: ${fmtN(candidatos.length)}.`,
+      preview.semProtocolo ? `Ignorados sem protocolo identificado: ${fmtN(preview.semProtocolo)}.` : '',
+      preview.errors?.length ? `Avisos de leitura: ${preview.errors.slice(0, 3).join(' | ')}` : '',
+    ].filter(Boolean).join(' ');
+
+    document.getElementById('limpaPreviewResumo').textContent = candidatos.length
+      ? `${fmtN(candidatos.length)} tratado(s) fora selecionado(s). Estados: ${resumo || '-'}.`
+      : 'Nenhum protocolo da mesa ficou fora das bases atuais.';
+    updateCleanupProgress({
+      total: preview.totalMesa || 0,
+      processed: 0,
+      success: 0,
+      error: 0,
+      pending: candidatos.length,
+      msg: candidatos.length ? 'Tratados fora selecionados. Aguardando confirmacao.' : 'Nenhum tratado fora encontrado.',
+    });
+    logLimpeza(aviso);
+
+    if (!candidatos.length) {
+      setProcessStatus('ok', 'Nenhum tratado fora encontrado');
+      toast('Nenhum protocolo da mesa ficou fora das bases atuais.', 'ok');
+      return;
+    }
+
+    const okConfirm = confirm(
+      `Limpar tratados fora\n\n` +
+      `Foram encontrados ${fmtN(candidatos.length)} protocolo(s) na mesa que nao existem ou nao entram nas bases atuais.\n\n` +
+      `Estados: ${resumo || '-'}\n\n` +
+      `Sem protocolo identificado foram ignorados: ${fmtN(preview.semProtocolo || 0)}.\n\n` +
+      `A limpeza sera real e somente nesses itens selecionados.\n\n` +
+      `Confirma a limpeza?`
+    );
+    if (!okConfirm) {
+      setProcessStatus('ok', 'Limpeza de tratados fora cancelada');
+      toast('Limpeza cancelada.', 'inf');
+      return;
+    }
+
+    setProcessStatus('run', 'Limpando tratados fora...');
+    const res = await api.limparMesa({
+      dryRun: false,
+      confirmText: 'LIMPAR',
+      cleanupMode: 'selected',
+      conversationIds: candidatos.map(r => r.conversationId),
+      records: candidatos,
+      filtros: { tratadosFora: true },
+    });
+
+    if (!res.ok) {
+      setProcessStatus('err', 'Falha ao limpar tratados fora');
+      logLimpeza(`Limpeza tratados fora falhou: ${res.msg}. Log: ${res.logPath || '-'}`);
+      toast(res.msg || 'Falha ao limpar tratados fora.', 'err');
+      return;
+    }
+
+    S.limpeza.lastRemoved = res.removed || 0;
+    S.limpeza.selected.clear();
+    const resultResumo = `${fmtN(res.removed || 0)} tratados fora removidos, ${fmtN(res.failures?.length || 0)} falhas, ${fmtN(res.ignored || 0)} ignorados.`;
+    document.getElementById('limpaPreviewResumo').textContent = resultResumo;
+    logLimpeza(`Limpeza tratados fora concluida: ${resultResumo} Log: ${res.logPath || '-'}`);
+    setProcessStatus('ok', 'Tratados fora limpos');
+    toast('Tratados fora limpos. Atualizando mesa...', 'ok');
+    await consultarMesaLimpeza();
+    document.getElementById('limpaPreviewResumo').textContent = resultResumo;
+  } catch (e) {
+    setProcessStatus('err', 'Erro ao limpar tratados fora');
+    logLimpeza('Erro em limpar tratados fora: ' + e.message);
+    toast('Erro ao limpar tratados fora: ' + e.message, 'err');
+  }
 }
 
 async function confirmarLimpezaReal() {
