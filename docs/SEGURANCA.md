@@ -123,8 +123,7 @@ O `.gitignore` cobre:
 - logs;
 - caches;
 - CSVs e planilhas geradas;
-- `inputMesa/MesaDistribuicao.py`;
-- `inputMesa/MesaDistribuicao.exe`;
+- scripts/executaveis operacionais antigos de `inputMesa`;
 - credenciais e tokens.
 
 Antes de commitar, sempre rode:
@@ -145,13 +144,13 @@ Nao documentar:
 - protocolo sensivel desnecessario;
 - conteudo de logs com dados reais.
 
-## Script externo de subida
+## Subida da mesa
 
-`inputMesa/MesaDistribuicao.py` e `inputMesa/MesaDistribuicao.exe` sao artefatos operacionais locais.
+A subida atual usa `scripts/mesa-upload.js`, empacotado com a aplicacao.
 
 Regras:
 
-- nao versionar enquanto houver credenciais internas;
+- nao colocar credenciais dentro do script;
 - preferir variaveis de ambiente;
 - manter logs sanitizados;
 - testar primeiro com CSV pequeno e validado.

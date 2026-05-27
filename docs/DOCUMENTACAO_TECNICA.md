@@ -26,7 +26,7 @@ main.js
   geracao CSV
   limpeza
   extracoes
-  subida externa
+  subida JS integrada
   logs
 
 scripts/extracao/
@@ -41,7 +41,7 @@ electron-builder.yml
 
 ## Principais arquivos
 
-- `main.js`: regras de negocio, IPC, Genesys, CSV, limpeza, extracoes, subida externa e logs.
+- `main.js`: regras de negocio, IPC, Genesys, CSV, limpeza, extracoes, subida JS integrada e logs.
 - `preload.js`: expoe `window.api` por `contextBridge`.
 - `index.html`: UI desktop completa.
 - `scripts/extracao/shared.js`: funcoes comuns dos extratores.
@@ -212,20 +212,26 @@ Tipos:
 
 Logs passam por sanitizacao para esconder tokens, `CLIENT_SECRET`, `CLIENT_ID` e senhas conhecidas.
 
-## Subida externa
+## Subida JS integrada
 
-`executar-mesa` procura, dentro de `getInputMesaDir()`:
-
-1. `MesaDistribuicao.py`;
-2. `MesaDistribuicao.exe`.
-
-Se usar Python:
+`executar-mesa` usa o runner empacotado:
 
 ```text
-python -X utf8 MesaDistribuicao.py
+scripts/mesa-upload.js
 ```
 
-O app injeta variaveis de ambiente para encoding, estrategia, workers, intervalo, pausa e timeout.
+O app copia o CSV gerado para `getInputMesaDir()`, executa o script com o mesmo runtime Node/Electron e injeta variaveis de ambiente para:
+
+- credenciais Genesys;
+- credenciais exclusivas de subida (`MESA_UPLOAD_CREDENTIALS`), quando configuradas;
+- estrategia;
+- workers;
+- intervalo;
+- pausa de lote;
+- timeout;
+- dry-run.
+
+O script le `mesa_distribuicao.csv`, cria as conversas por `/api/v2/conversations/emails`, registra log JSONL em `getLogDir('upload')` e retorna erro se houver falhas de envio.
 
 ## Build desktop
 

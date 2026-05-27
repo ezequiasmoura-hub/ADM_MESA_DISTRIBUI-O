@@ -8,8 +8,8 @@ Este projeto esta configurado para gerar uma aplicacao desktop Windows com Elect
 - O empacotador escolhido foi `electron-builder`, por ser direto para instalador NSIS, portable `.exe`, icone, recursos extras e automacao via `package.json`.
 - A saida atual gera:
   - app unpacked em `dist/win-unpacked/`;
-  - instalador em `dist/ADM-Mesa-de-Distribuicao-2.0.0-Setup-x64.exe`;
-  - portable em `dist/ADM-Mesa-de-Distribuicao-2.0.0-Portable-x64.exe`.
+  - instalador em `dist/ADM-Mesa-de-Distribuicao-2.1.0-Setup-x64.exe`;
+  - portable em `dist/ADM-Mesa-de-Distribuicao-2.1.0-Portable-x64.exe`.
 
 ## Pre-requisitos
 
@@ -91,8 +91,8 @@ npm run dist:win
 Saidas:
 
 ```text
-dist/ADM-Mesa-de-Distribuicao-2.0.0-Setup-x64.exe
-dist/ADM-Mesa-de-Distribuicao-2.0.0-Portable-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.1.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.1.0-Portable-x64.exe
 ```
 
 O instalador cria atalhos e pode permitir escolha de pasta. O portable e melhor para teste rapido ou operacao sem instalacao formal.
@@ -183,7 +183,7 @@ Incluidos:
 - `assets/**/*`;
 - `docs/**/*`;
 - `README.md`;
-- `inputMesa/RODARMESA.bat` como recurso extra.
+- `scripts/mesa-upload.js` para subida integrada da mesa.
 
 Excluidos:
 
@@ -246,7 +246,7 @@ Depois gere o build novamente.
 
 ### Arquivo operacional nao encontrado
 
-Confirme na tela **Configuracoes** a pasta `INPUT_MESA_DIR`. O app procura `MesaDistribuicao.py`, `MesaDistribuicao.exe` e `mesa_distribuicao.csv` nessa pasta.
+Confirme na tela **Configuracoes** a pasta `INPUT_MESA_DIR`. O app usa essa pasta para `mesa_distribuicao.csv`; a subida fica empacotada em `scripts/mesa-upload.js`.
 
 ### Credenciais nao carregam
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.0 - 2026-05-27
+
+### Alteracoes
+
+- Subida da mesa migrada de `MesaDistribuicao.py/.exe` para `scripts/mesa-upload.js`.
+- Credenciais de subida removidas do script e centralizadas em `.env`/tela de configuracoes.
+- Adicionada configuracao `MESA_UPLOAD_CREDENTIALS` para multiplas credenciais no formato `nome|client_id|client_secret`.
+- Caminhos externos dos extratores passaram a ser respeitados mesmo fora da pasta embutida.
+- Build passou a empacotar o runner JavaScript de subida junto com a aplicacao.
+- Versao do aplicativo atualizada para `2.1.0`.
+
+### Correcoes
+
+- Corrigida a normalizacao que descartava scripts externos de extracao apos instalar o app.
+- Removida dependencia operacional do `MesaDistribuicao.exe` para subida da mesa.
+- Ignorados logs JSONL gerados por testes/operacao.
+
 ## 2.0.1 - 2026-05-26
 
 ### Alteracoes

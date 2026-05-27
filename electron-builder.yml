@@ -27,12 +27,6 @@ files:
   - "!extracao/**/*"
   - "!legacy/**/*"
 
-extraResources:
-  - from: inputMesa/RODARMESA.bat
-    to: inputMesa/RODARMESA.bat
-    filter:
-      - "**/*"
-
 win:
   icon: assets/icon.ico
   signAndEditExecutable: false

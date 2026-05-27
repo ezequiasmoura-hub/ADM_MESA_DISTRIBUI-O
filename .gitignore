@@ -28,6 +28,7 @@ legacy/**/.env.*
 # Logs
 logs/
 *.log
+*.jsonl
 inputMesa/*.log
 inputMesa/logs_*.txt
 

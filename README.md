@@ -9,7 +9,7 @@ O projeto foi preparado para empacotamento Windows com `electron-builder`, geran
 - Gerar o CSV operacional no padrao da aba `MESA DE DISTRIBUICAO` do BI.
 - Consultar a mesa atual do Genesys antes de gerar a base e remover protocolos ja existentes.
 - Rodar os extratores Site Novo, Site Antigo, GO e RS/CEEE em JavaScript.
-- Permitir modo automatico: extrair bases, gerar CSV respeitando os filtros da tela e executar a subida externa da mesa.
+- Permitir modo automatico: extrair bases, gerar CSV respeitando os filtros da tela e executar a subida JS integrada da mesa.
 - Consultar e limpar conversas da mesa com confirmacao, controle de ritmo e auditoria.
 
 ## Funcionalidades principais
@@ -20,6 +20,7 @@ O projeto foi preparado para empacotamento Windows com `electron-builder`, geran
 - Geracao fixa de `mesa_distribuicao.csv`, com separador `;` e UTF-8 com BOM.
 - Deduplicacao contra protocolos ja presentes na mesa do Genesys.
 - Tela **Extrair Bases** com execucao individual ou concorrente dos quatro extratores.
+- Caminhos dos extratores configuraveis na tela **Extrair Bases**, permitindo apontar para scripts `.js` externos sem refazer o build.
 - Tela **Limpeza da Mesa** com filtros multiselecao, selecao manual e confirmacao.
 - Limpeza por itens selecionados ou, quando aplicavel, por ID de fila/estado.
 - Rate limiter global configuravel, padrao `280` requests/min e maximo operacional `300`.
@@ -56,7 +57,7 @@ MESA AUTO/
     icon.svg                 Fonte editavel do icone
     logo.png                 Logo local
   scripts/extracao/          Extratores Site Novo, Site Antigo, GO e RS
-  inputMesa/                 Pasta operacional local para CSV e executor externo
+  inputMesa/                 Pasta operacional local para CSV gerado
   docs/                      Documentacao tecnica e operacional
   legacy/                    Referencias antigas, fora do fluxo principal
   extracao/                  Material legado, fora do fluxo principal
@@ -92,6 +93,7 @@ QUEUE_IDS=queue-id-1,queue-id-2
 CLEANUP_CONCURRENCY=10
 CLEANUP_RATE_LIMIT_PER_MINUTE=280
 CLEANUP_RATE_LIMIT_FALLBACK_SECONDS=30
+MESA_UPLOAD_CREDENTIALS=
 ```
 
 A tela **Configuracoes** tambem permite ajustar:
@@ -101,7 +103,9 @@ A tela **Configuracoes** tambem permite ajustar:
 - IDs de fila para consulta e limpeza;
 - pastas locais de `inputMesa` e logs;
 - rate limit, paralelismo e retry;
-- parametros da subida externa da mesa.
+- parametros da subida JS integrada da mesa.
+
+Para multiplas credenciais de subida, use o formato `nome|client_id|client_secret`, uma por linha, em **Credenciais da Subida JS**. Se vazio, a subida usa `CLIENT_ID`/`CLIENT_SECRET`.
 
 O renderer nao recebe `CLIENT_SECRET` nem senhas ja salvas; ele recebe apenas indicadores como "secret configurado". Senhas vazias na tela preservam o valor salvo.
 
@@ -143,8 +147,8 @@ Saidas principais:
 
 ```text
 dist/win-unpacked/ADM Mesa de Distribuição.exe
-dist/ADM-Mesa-de-Distribuicao-2.0.0-Setup-x64.exe
-dist/ADM-Mesa-de-Distribuicao-2.0.0-Portable-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.1.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.1.0-Portable-x64.exe
 ```
 
 Detalhes completos em [docs/BUILD_E_EXECUTAVEL.md](docs/BUILD_E_EXECUTAVEL.md).
@@ -194,7 +198,7 @@ Leia tambem [docs/SEGURANCA.md](docs/SEGURANCA.md).
 
 - O build usa `asar: false` por compatibilidade com os scripts externos e Playwright. A evolucao recomendada e migrar para `asar: true` com `asarUnpack`.
 - Neste Windows, a edicao de recursos do executavel pelo `winCodeSign` falha sem privilegio de criar links simbolicos. Por isso `signAndEditExecutable: false` fica ativo. O app gera `.exe` funcional; para embutir icone/metadata no arquivo do executavel, use Windows Developer Mode ou terminal admin e remova esse fallback.
-- O script externo de subida (`MesaDistribuicao.py` ou `.exe`) e artefato operacional local; credenciais internas devem ser removidas antes de versionar.
+- A subida da mesa agora usa `scripts/mesa-upload.js`, empacotado com a aplicacao. Credenciais de subida ficam no app/.env, nao no script.
 - Nao existe checkpoint persistente da limpeza se o app for fechado no meio da operacao.
 
 ## Proximos passos

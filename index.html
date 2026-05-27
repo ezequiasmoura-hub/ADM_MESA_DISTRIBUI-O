@@ -1487,7 +1487,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
         <div class="auto-row">
           <div class="auto-info">
             <div class="auto-title">Executar automaticamente</div>
-            <div class="auto-sub">Roda as 4 extracoes, valida sucesso, gera a base com os filtros atuais e pode executar o MesaDistribuicao.exe</div>
+            <div class="auto-sub">Roda as 4 extracoes, valida sucesso, gera a base com os filtros atuais e pode executar a subida JS integrada</div>
           </div>
           <label class="toggle">
             <input type="checkbox" id="autoToggle" onchange="onAutoToggle()"/>
@@ -1507,7 +1507,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
         <div class="card" style="display:flex;align-items:center;gap:16px;">
           <div style="flex:1">
             <div style="font-size:12px;font-weight:600">Subir na mesa automaticamente</div>
-            <div style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-top:2px">Executa o MesaDistribuicao.exe apos gerar o CSV filtrado</div>
+            <div style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-top:2px">Executa a subida JS integrada apos gerar o CSV filtrado</div>
           </div>
           <label class="toggle">
             <input type="checkbox" id="autoSubirToggle" checked/>
@@ -1592,7 +1592,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
         <div class="cfg-section-title" style="margin-top:8px">Pastas locais do aplicativo</div>
         <div style="padding:0 0 12px;display:flex;flex-direction:column;gap:10px">
           <div>
-            <div class="cfg-label">Pasta inputMesa / CSV / executor externo</div>
+            <div class="cfg-label">Pasta inputMesa / CSV gerado</div>
             <div class="cfg-row">
               <input class="cfg-path" id="cfg-input-mesa-dir" type="text" placeholder="Padrao automatico do aplicativo"/>
               <button class="btn btn-ghost btn-sm" onclick="pickCfgFolder('cfg-input-mesa-dir')">Procurar</button>
@@ -1663,6 +1663,13 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
               </div>
             </div>
           </div>
+        </div>
+
+        <div class="cfg-section-title" style="margin-top:8px">Credenciais da Subida JS</div>
+        <div style="padding:0 0 12px;display:flex;flex-direction:column;gap:8px">
+          <div class="cfg-label">Opcional: uma por linha no formato nome|client_id|client_secret. Se ficar vazio, usa CLIENT_ID/CLIENT_SECRET do Genesys.</div>
+          <textarea class="cfg-path" id="cfg-upload-credentials" rows="4" style="resize:vertical;font-size:11px;line-height:1.6" placeholder="URA_0|client_id|client_secret&#10;URA_1|client_id|client_secret"></textarea>
+          <div class="cfg-label" id="cfg-upload-credentials-status"></div>
         </div>
 
         <div class="cfg-section-title" style="margin-top:8px">Genesys Cloud — Credenciais</div>
@@ -2249,6 +2256,7 @@ const EXTRACTION_META = {
   siteAntigo: { label: 'Site Antigo - BKO All', runtime: 'node' },
   go: { label: 'GO', runtime: 'node' },
   rs: { label: 'RS / CEEE', runtime: 'node' },
+  uploadMesa: { label: 'Subida JS', runtime: 'node' },
 };
 
 function applyExtractionConfigToUI(scripts) {
@@ -2443,7 +2451,7 @@ async function executarFluxo(isAutoRun = false) {
 
     if (deveSubir && res.outputPath) {
       setProcessStatus('run', 'Subindo na mesa…');
-      document.getElementById('progressLabel').textContent = 'Executando MesaDistribuicao.exe…';
+      document.getElementById('progressLabel').textContent = 'Executando subida JS integrada...';
       document.getElementById('progressBar').style.width = '90%';
 
       const mesaRes = await api.executarMesa(res.outputPath);
@@ -2451,7 +2459,7 @@ async function executarFluxo(isAutoRun = false) {
       if (mesaRes.ok) {
         document.getElementById('rs3').textContent = fmtN(res.total);
         setProcessStatus('ok', 'Mesa atualizada com sucesso!');
-        appendLog(5, 'MesaDistribuicao.exe executado com sucesso.');
+        appendLog(5, 'Subida JS integrada executada com sucesso.');
         appendAutoHistory(`Mesa atualizada com ${fmtN(res.total)} registros`);
         toast('Base gerada e subida na mesa com sucesso!', 'ok');
       } else {
@@ -2584,6 +2592,15 @@ function applyConfigToUI(cfg) {
   document.getElementById('cfg-upload-workers').value = cfg.MESA_UPLOAD_WORKERS || 5;
   document.getElementById('cfg-upload-interval').value = cfg.MESA_UPLOAD_INTERVAL_SECONDS ?? 2;
   document.getElementById('cfg-upload-timeout').value = cfg.MESA_UPLOAD_TIMEOUT_MINUTES ?? 0;
+  const uploadCredInput = document.getElementById('cfg-upload-credentials');
+  const uploadCredStatus = document.getElementById('cfg-upload-credentials-status');
+  if (uploadCredInput) uploadCredInput.value = '';
+  if (uploadCredStatus) {
+    const count = Number(cfg.MESA_UPLOAD_CREDENTIALS_CONFIGURED || 0);
+    uploadCredStatus.textContent = count
+      ? `${count} credencial(is) de subida salva(s). Deixe vazio para manter.`
+      : 'Nenhuma credencial exclusiva de subida salva; sera usado CLIENT_ID/CLIENT_SECRET.';
+  }
   document.getElementById('autoInterval').value = cfg.AUTO_INTERVAL_MIN || 30;
   applyExtractionConfigToUI(cfg.EXTRACTION_SCRIPTS || {});
   applyExtractionCredentialsToUI(cfg.EXTRACTION_CREDENTIALS || {});
@@ -2651,6 +2668,7 @@ async function saveConfig() {
     MESA_UPLOAD_INTERVAL_SECONDS: readNumberInput('cfg-upload-interval', 2),
     MESA_UPLOAD_BATCH_PAUSE_SECONDS: readNumberInput('cfg-upload-interval', 2),
     MESA_UPLOAD_TIMEOUT_MINUTES: readNumberInput('cfg-upload-timeout', 0),
+    MESA_UPLOAD_CREDENTIALS: document.getElementById('cfg-upload-credentials')?.value || '',
     AUTO_INTERVAL_MIN : parseInt(document.getElementById('autoInterval').value) || 30,
     UI_THEME          : S.theme,
     EXTRACTION_CREDENTIALS: getExtractionCredentialsFromUI(),

@@ -72,7 +72,7 @@ QUEUE_IDS=queue-id-1,queue-id-2
 
 ### `INPUT_MESA_DIR`
 
-Pasta onde ficam o CSV final e o executor externo da subida.
+Pasta onde fica o CSV final `mesa_distribuicao.csv`.
 
 ```env
 INPUT_MESA_DIR=C:\Caminho\Operacional\inputMesa
@@ -167,7 +167,7 @@ MESA_PROTOCOL_INTERVAL_DAYS=30
 
 ## Subida da mesa
 
-Essas variaveis sao passadas para `MesaDistribuicao.py` quando a UI executa a subida externa.
+A subida da mesa e feita pelo script JavaScript empacotado `scripts/mesa-upload.js`. As credenciais ficam no app/.env ou na tela **Configuracoes**, nunca dentro do script.
 
 ### `MESA_UPLOAD_STRATEGY`
 
@@ -181,9 +181,19 @@ Valores:
 - `batch`;
 - `serial`.
 
+### `MESA_UPLOAD_CREDENTIALS`
+
+Credenciais exclusivas da subida. Use uma credencial por linha no formato:
+
+```env
+MESA_UPLOAD_CREDENTIALS=URA_0|client_id|client_secret;URA_1|client_id|client_secret
+```
+
+Se ficar vazio, o upload usa `CLIENT_ID` e `CLIENT_SECRET` do Genesys.
+
 ### `MESA_UPLOAD_WORKERS`
 
-Quantidade de workers da subida externa.
+Quantidade de workers da subida JS integrada.
 
 ```env
 MESA_UPLOAD_WORKERS=5
@@ -215,7 +225,7 @@ Timeout do processo externo. `0` significa sem timeout imposto pelo Electron.
 MESA_UPLOAD_TIMEOUT_MINUTES=0
 ```
 
-### Variaveis do script Python
+### Variaveis do script JS
 
 ```env
 MESA_REQUEST_RETRIES=8
@@ -226,7 +236,8 @@ MESA_TOKEN_RETRY_SECONDS=15
 MESA_DRY_RUN=0
 ```
 
-`MESA_DRY_RUN=1` deve ser usado somente para diagnostico do script externo.
+`MESA_DRY_RUN=1` deve ser usado somente para diagnostico da subida JS.
+`MESA_DRY_RUN=1` simula a leitura do CSV sem criar conversas no Genesys.
 
 ## Extracoes
 
@@ -271,6 +282,7 @@ EXTRACAO_BASE_DIR=C:\Bases\Mesa
 ### Site Novo
 
 ```env
+EXTRACAO_SITE_NOVO_SCRIPT=
 EXTRACAO_SITE_NOVO_CDP=0
 EXTRACAO_SITE_NOVO_RETRY_MS=30000
 EXTRACAO_SITE_NOVO_MAX_TENTATIVAS=3
@@ -280,6 +292,9 @@ EXTRACAO_SITE_NOVO_START_DATE=2026-01-01
 ### Concorrencia dos extratores
 
 ```env
+EXTRACAO_SITE_ANTIGO_SCRIPT=
+EXTRACAO_GO_SCRIPT=
+EXTRACAO_RS_SCRIPT=
 EXTRACAO_ANTIGO_CONCORRENCIA=50
 EXTRACAO_GO_CONCORRENCIA=100
 EXTRACAO_RS_CONCORRENCIA=100
@@ -295,14 +310,6 @@ Runtime usado para scripts Node em desenvolvimento. No app empacotado, se vazio,
 NODE_BIN=node
 ```
 
-### `PYTHON_BIN`
-
-Runtime usado para `MesaDistribuicao.py`.
-
-```env
-PYTHON_BIN=python
-```
-
 ## Configuracoes da tela
 
 - **Modo claro**: alterna tema.
@@ -311,7 +318,7 @@ PYTHON_BIN=python
 - **Credenciais de extracao**: usuario/senha por origem.
 - **Genesys Cloud**: regiao, client id, client secret e filas.
 - **Velocidade da limpeza**: paralelo, req/min e fallback 429.
-- **Subida segura da mesa**: estrategia, workers, intervalo e timeout.
+- **Subida segura da mesa**: credenciais, estrategia, workers, intervalo e timeout.
 
 ## Exemplo seguro de `.env`
 

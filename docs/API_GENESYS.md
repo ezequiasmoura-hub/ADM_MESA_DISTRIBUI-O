@@ -10,7 +10,7 @@ A aplicacao Electron usa:
 purecloud-platform-client-v2
 ```
 
-O script externo de subida `inputMesa/MesaDistribuicao.py`, quando usado, usa `requests` diretamente.
+A subida da mesa usa o script JavaScript empacotado `scripts/mesa-upload.js`.
 
 ## Autenticacao
 
@@ -136,15 +136,15 @@ Uso:
 
 Essa chamada e destrutiva para a operacao da mesa. Ela so deve ser executada apos filtro, selecao/consulta por fila e confirmacao.
 
-## Endpoint usado pelo script externo de subida
+## Endpoint usado pela subida JS da mesa
 
-Quando `inputMesa/MesaDistribuicao.py` e usado, ele cria conversas de e-mail por:
+Quando a UI executa a subida, `scripts/mesa-upload.js` cria conversas de e-mail por:
 
 ```text
 POST /api/v2/conversations/emails
 ```
 
-Esse script e externo ao fluxo principal do Electron e deve ter credenciais externalizadas antes de ser versionado.
+As credenciais sao recebidas do processo principal por variaveis de ambiente. O script nao contem client secret fixo.
 
 ## Permissoes necessarias
 

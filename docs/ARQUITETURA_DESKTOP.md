@@ -60,7 +60,7 @@ main.js
   geracao CSV
   limpeza
   extracoes
-  execucao de MesaDistribuicao.py/.exe
+  subida JS integrada da mesa
 
 preload.js
   API controlada para o renderer

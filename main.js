@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
-const { execFile, spawn } = require('child_process');
+const { spawn } = require('child_process');
 
 // ── Carrega .env da pasta do projeto e do inputMesa como fallback ─────────────
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -73,6 +73,18 @@ function defaultExtractionCredential(id) {
   };
 }
 
+function defaultExtractionScript(id, label, fileName) {
+  const key = EXTRACTION_ENV_KEYS[id];
+  const configuredPath = envFirst(`EXTRACAO_${key}_SCRIPT`, `EXTRACAO_${key}_SCRIPT_PATH`);
+  const scriptPath = configuredPath || path.join(__dirname, 'scripts', 'extracao', fileName);
+  return {
+    label,
+    runtime: 'node',
+    path: scriptPath,
+    cwd: envFirst(`EXTRACAO_${key}_CWD`) || path.dirname(scriptPath),
+  };
+}
+
 let CONFIG = {
   PATH_PRIORIZACAO : "H:\\TEMOTEO - NAO ABRA\\Base\\PRIORIZAÇÃO_MESA_BKO.xlsx",
   PATH_EQTL_RS     : "H:\\TEMOTEO - NAO ABRA\\Base\\EQTL_RS.csv",
@@ -101,30 +113,10 @@ let CONFIG = {
           "e9bf42cd-e23f-4d70-ac0d-2ad60602ba9f"
         ],
   EXTRACTION_SCRIPTS: {
-    siteNovo: {
-      label: 'Site Novo',
-      runtime: 'node',
-      path: path.join(__dirname, 'scripts', 'extracao', 'site-novo.js'),
-      cwd: path.join(__dirname, 'scripts', 'extracao'),
-    },
-    siteAntigo: {
-      label: 'Site Antigo - BKO All',
-      runtime: 'node',
-      path: path.join(__dirname, 'scripts', 'extracao', 'site-antigo.js'),
-      cwd: path.join(__dirname, 'scripts', 'extracao'),
-    },
-    go: {
-      label: 'GO',
-      runtime: 'node',
-      path: path.join(__dirname, 'scripts', 'extracao', 'go.js'),
-      cwd: path.join(__dirname, 'scripts', 'extracao'),
-    },
-    rs: {
-      label: 'RS / CEEE',
-      runtime: 'node',
-      path: path.join(__dirname, 'scripts', 'extracao', 'rs.js'),
-      cwd: path.join(__dirname, 'scripts', 'extracao'),
-    },
+    siteNovo: defaultExtractionScript('siteNovo', 'Site Novo', 'site-novo.js'),
+    siteAntigo: defaultExtractionScript('siteAntigo', 'Site Antigo - BKO All', 'site-antigo.js'),
+    go: defaultExtractionScript('go', 'GO', 'go.js'),
+    rs: defaultExtractionScript('rs', 'RS / CEEE', 'rs.js'),
   },
   EXTRACTION_CREDENTIALS: {
     siteNovo: defaultExtractionCredential('siteNovo'),
@@ -133,12 +125,12 @@ let CONFIG = {
     rs: defaultExtractionCredential('rs'),
   },
   NODE_BIN         : process.env.NODE_BIN || 'node',
-  PYTHON_BIN       : process.env.PYTHON_BIN || 'python',
   MESA_DETAIL_RETRIES: process.env.MESA_DETAIL_RETRIES === '0' ? 0 : (Number(process.env.MESA_DETAIL_RETRIES) || 30),
   MESA_DETAIL_RETRY_DELAY_MS: Number(process.env.MESA_DETAIL_RETRY_DELAY_MS) || 1500,
   MESA_PROTOCOL_CONCURRENCY: Number(process.env.MESA_PROTOCOL_CONCURRENCY) || 12,
   MESA_PROTOCOL_INTERVAL_DAYS: Number(process.env.MESA_PROTOCOL_INTERVAL_DAYS) || 30,
   MESA_UPLOAD_STRATEGY: process.env.MESA_UPLOAD_STRATEGY || 'paced',
+  MESA_UPLOAD_CREDENTIALS: process.env.MESA_UPLOAD_CREDENTIALS_JSON || process.env.MESA_UPLOAD_CREDENTIALS || '',
   MESA_UPLOAD_WORKERS: Math.max(1, envNumber('MESA_UPLOAD_WORKERS', 5)),
   MESA_UPLOAD_INTERVAL_SECONDS: Math.max(0, envNumber('MESA_UPLOAD_INTERVAL_SECONDS', 2)),
   MESA_UPLOAD_BATCH_PAUSE_SECONDS: Math.max(0, envNumber('MESA_UPLOAD_BATCH_PAUSE_SECONDS', 2)),
@@ -173,12 +165,12 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'EXTRACTION_SCRIPTS',
   'EXTRACTION_CREDENTIALS',
   'NODE_BIN',
-  'PYTHON_BIN',
   'MESA_DETAIL_RETRIES',
   'MESA_DETAIL_RETRY_DELAY_MS',
   'MESA_PROTOCOL_CONCURRENCY',
   'MESA_PROTOCOL_INTERVAL_DAYS',
   'MESA_UPLOAD_STRATEGY',
+  'MESA_UPLOAD_CREDENTIALS',
   'MESA_UPLOAD_WORKERS',
   'MESA_UPLOAD_INTERVAL_SECONDS',
   'MESA_UPLOAD_BATCH_PAUSE_SECONDS',
@@ -246,6 +238,20 @@ function getLogDir(...parts) {
   return path.join(root, ...parts);
 }
 
+function countMesaUploadCredentials(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return CONFIG.CLIENT_ID && CONFIG.CLIENT_SECRET ? 1 : 0;
+  try {
+    if (text.startsWith('[')) {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed.length : 0;
+    }
+  } catch (_) {
+    return 0;
+  }
+  return text.split(/\r?\n|;/).map(line => line.trim()).filter(Boolean).length;
+}
+
 function createPublicConfig() {
   const extractionCredentials = {};
   for (const id of EXTRACTION_IDS) {
@@ -261,6 +267,8 @@ function createPublicConfig() {
     ...CONFIG,
     CLIENT_SECRET: '',
     CLIENT_SECRET_CONFIGURED: !!CONFIG.CLIENT_SECRET,
+    MESA_UPLOAD_CREDENTIALS: '',
+    MESA_UPLOAD_CREDENTIALS_CONFIGURED: countMesaUploadCredentials(CONFIG.MESA_UPLOAD_CREDENTIALS),
     EXTRACTION_CREDENTIALS: extractionCredentials,
     QUEUE_IDS: getQueueIds(),
     INPUT_MESA_DIR_EFFECTIVE: getInputMesaDir(),
@@ -295,18 +303,21 @@ function normalizeConfigAfterLoad() {
   if (!Array.isArray(CONFIG.PATHS_XLS) || !CONFIG.PATHS_XLS.length || CONFIG.PATHS_XLS.some(isLegacySiteNovoXlsPath)) {
     CONFIG.PATHS_XLS = [...DEFAULT_SITE_NOVO_XLS_PATHS];
   }
-  const scriptsRoot = path.resolve(__dirname, 'scripts', 'extracao').toLowerCase();
   CONFIG.EXTRACTION_SCRIPTS = {
     ...DEFAULT_EXTRACTION_SCRIPTS,
     ...(CONFIG.EXTRACTION_SCRIPTS || {}),
   };
   for (const id of Object.keys(DEFAULT_EXTRACTION_SCRIPTS)) {
     const current = CONFIG.EXTRACTION_SCRIPTS[id] || {};
-    const currentPath = current.path ? path.resolve(current.path).toLowerCase() : '';
-    const shouldUseBundled = current.runtime !== 'node'
-      || !currentPath.startsWith(scriptsRoot)
-      || !fs.existsSync(current.path || '');
-    if (shouldUseBundled) CONFIG.EXTRACTION_SCRIPTS[id] = { ...DEFAULT_EXTRACTION_SCRIPTS[id] };
+    const fallback = DEFAULT_EXTRACTION_SCRIPTS[id];
+    const scriptPath = String(current.path || '').trim() || fallback.path;
+    CONFIG.EXTRACTION_SCRIPTS[id] = {
+      ...fallback,
+      ...current,
+      runtime: 'node',
+      path: scriptPath,
+      cwd: String(current.cwd || '').trim() || path.dirname(scriptPath),
+    };
   }
   CONFIG.EXTRACTION_CREDENTIALS = {
     ...DEFAULT_EXTRACTION_CREDENTIALS,
@@ -325,6 +336,7 @@ function normalizeConfigAfterLoad() {
   CONFIG.MESA_UPLOAD_STRATEGY = ['paced', 'batch', 'serial'].includes(CONFIG.MESA_UPLOAD_STRATEGY)
     ? CONFIG.MESA_UPLOAD_STRATEGY
     : 'paced';
+  CONFIG.MESA_UPLOAD_CREDENTIALS = String(CONFIG.MESA_UPLOAD_CREDENTIALS || process.env.MESA_UPLOAD_CREDENTIALS_JSON || process.env.MESA_UPLOAD_CREDENTIALS || '').trim();
   CONFIG.MESA_UPLOAD_WORKERS = Math.max(1, Math.min(5, Number(String(CONFIG.MESA_UPLOAD_WORKERS).replace(',', '.')) || 5));
   CONFIG.MESA_UPLOAD_INTERVAL_SECONDS = Math.max(0, Number(String(CONFIG.MESA_UPLOAD_INTERVAL_SECONDS).replace(',', '.')) || 2);
   CONFIG.MESA_UPLOAD_BATCH_PAUSE_SECONDS = Math.max(0, Number(String(CONFIG.MESA_UPLOAD_BATCH_PAUSE_SECONDS).replace(',', '.')) || CONFIG.MESA_UPLOAD_INTERVAL_SECONDS || 2);
@@ -853,7 +865,7 @@ function sanitizeProcessOutput(text) {
   const extractionSecrets = Object.values(CONFIG.EXTRACTION_CREDENTIALS || {})
     .flatMap(c => [c?.password, c?.username])
     .filter(Boolean);
-  const secrets = [CONFIG.CLIENT_SECRET, CONFIG.CLIENT_ID, ...extractionSecrets]
+  const secrets = [CONFIG.CLIENT_SECRET, CONFIG.CLIENT_ID, CONFIG.MESA_UPLOAD_CREDENTIALS, ...extractionSecrets]
     .filter(s => s && String(s).length >= 4);
   for (const secret of secrets) out = out.split(secret).join('***');
   out = out.replace(/Bearer\s+[A-Za-z0-9._\-]+/g, 'Bearer ***');
@@ -892,7 +904,7 @@ function runExtractionScript(id) {
   }
 
   const nodeExecution = getNodeExecution();
-  const runtime = script.runtime === 'python' ? (CONFIG.PYTHON_BIN || 'python') : nodeExecution.command;
+  const runtime = nodeExecution.command;
   const cwd = script.cwd && fs.existsSync(script.cwd) ? script.cwd : path.dirname(scriptPath);
   const logDir = ensureDir(getLogDir('extracoes'));
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -1159,6 +1171,9 @@ function applyConfigPatch(newCfg = {}) {
   if (Object.prototype.hasOwnProperty.call(patch, 'CLIENT_SECRET') && !String(patch.CLIENT_SECRET || '').trim()) {
     delete patch.CLIENT_SECRET;
   }
+  if (Object.prototype.hasOwnProperty.call(patch, 'MESA_UPLOAD_CREDENTIALS') && !String(patch.MESA_UPLOAD_CREDENTIALS || '').trim()) {
+    delete patch.MESA_UPLOAD_CREDENTIALS;
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'EXTRACTION_CREDENTIALS')) {
     patch.EXTRACTION_CREDENTIALS = mergeExtractionCredentials(patch.EXTRACTION_CREDENTIALS);
   }
@@ -1286,51 +1301,94 @@ ipcMain.handle('stop-auto', () => {
   return true;
 });
 
-// ─── IPC: executar MesaDistribuicao.exe ──────────────────────────────────────
+// ─── IPC: subida JS integrada da mesa ────────────────────────────────────────
 ipcMain.handle('executar-mesa', async (_, csvPath) => {
   const inputDir = ensureDir(getInputMesaDir());
-  const pyPath = path.join(inputDir, 'MesaDistribuicao.py');
-  const exePath = path.join(inputDir, 'MesaDistribuicao.exe');
-  const usePy = fs.existsSync(pyPath);
+  const uploadScript = path.join(__dirname, 'scripts', 'mesa-upload.js');
 
-  if (!usePy && !fs.existsSync(exePath)) {
-    return { ok: false, msg: `MesaDistribuicao.py ou MesaDistribuicao.exe nao encontrado em ${inputDir}` };
+  if (!fs.existsSync(uploadScript)) {
+    return { ok: false, msg: `Script de subida JS nao encontrado: ${uploadScript}` };
   }
 
-  // Copia CSV para inputMesa/
   const destCsv = path.join(inputDir, path.basename(csvPath));
   if (path.resolve(csvPath) !== path.resolve(destCsv)) {
     fs.copyFileSync(csvPath, destCsv);
   }
 
   return new Promise(resolve => {
-    const command = usePy ? (CONFIG.PYTHON_BIN || 'python') : exePath;
-    const args = usePy ? ['-X', 'utf8', pyPath] : [];
+    const nodeExecution = getNodeExecution();
+    const command = nodeExecution.command;
+    const args = [uploadScript, destCsv];
     const timeoutMinutes = Number(CONFIG.MESA_UPLOAD_TIMEOUT_MINUTES) || 0;
-    execFile(command, args, {
+    const child = spawn(command, args, {
       cwd: inputDir,
-      timeout: timeoutMinutes > 0 ? timeoutMinutes * 60 * 1000 : 0,
-      maxBuffer: 50 * 1024 * 1024,
       windowsHide: true,
+      shell: false,
       env: {
         ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
+        ...nodeExecution.env,
+        CLIENT_ID: String(CONFIG.CLIENT_ID || ''),
+        CLIENT_SECRET: String(CONFIG.CLIENT_SECRET || ''),
+        ORG_REGION: String(CONFIG.ORG_REGION || 'sa_east_1'),
+        MESA_UPLOAD_CREDENTIALS: String(CONFIG.MESA_UPLOAD_CREDENTIALS || ''),
+        MESA_UPLOAD_LOG_DIR: getLogDir('upload'),
         MESA_UPLOAD_STRATEGY: String(CONFIG.MESA_UPLOAD_STRATEGY || 'paced'),
         MESA_UPLOAD_WORKERS: String(CONFIG.MESA_UPLOAD_WORKERS || 5),
         MESA_UPLOAD_INTERVAL_SECONDS: String(CONFIG.MESA_UPLOAD_INTERVAL_SECONDS ?? 2),
         MESA_UPLOAD_BATCH_PAUSE_SECONDS: String(CONFIG.MESA_UPLOAD_BATCH_PAUSE_SECONDS ?? CONFIG.MESA_UPLOAD_INTERVAL_SECONDS ?? 2),
+        MESA_REQUEST_RETRIES: String(process.env.MESA_REQUEST_RETRIES || 8),
+        MESA_REQUEST_TIMEOUT_SECONDS: String(process.env.MESA_REQUEST_TIMEOUT_SECONDS || 25),
+        MESA_RATE_LIMIT_SLEEP_SECONDS: String(process.env.MESA_RATE_LIMIT_SLEEP_SECONDS || 30),
+        MESA_DRY_RUN: String(process.env.MESA_DRY_RUN || '0'),
       },
-    }, (err, stdout, stderr) => {
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let done = false;
+    let timeoutHandle = null;
+
+    if (timeoutMinutes > 0) {
+      timeoutHandle = setTimeout(() => {
+        done = true;
+        child.kill();
+        appendAppLog('error', 'Timeout na subida JS da mesa', { inputDir, timeoutMinutes });
+        resolve({ ok: false, msg: `Subida da mesa excedeu o timeout de ${timeoutMinutes} minuto(s).` });
+      }, timeoutMinutes * 60 * 1000);
+    }
+
+    const capture = (chunk, type) => {
+      const text = sanitizeProcessOutput(chunk.toString());
+      if (type === 'err') stderr += text;
+      else stdout += text;
+      text.split(/\r?\n/).filter(Boolean).slice(-20).forEach(line => emitExtractionLog('uploadMesa', line, type));
+    };
+
+    child.stdout.on('data', chunk => capture(chunk, 'out'));
+    child.stderr.on('data', chunk => capture(chunk, 'err'));
+
+    child.on('error', error => {
+      if (done) return;
+      done = true;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      const msg = sanitizeProcessOutput(error.message);
+      appendAppLog('error', 'Falha ao iniciar subida JS da mesa', { error: msg, inputDir });
+      resolve({ ok: false, msg });
+    });
+
+    child.on('close', code => {
+      if (done) return;
+      done = true;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
       const out = sanitizeProcessOutput(stdout || '');
       const errOut = sanitizeProcessOutput(stderr || '');
-      if (err) {
-        const parts = [errOut || err.message, out].filter(Boolean);
-        appendAppLog('error', 'Falha ao executar subida da mesa', { error: err.message, inputDir });
-        resolve({ ok: false, msg: parts.join('\n').trim() || err.message });
+      if (code === 0) {
+        appendAppLog('info', 'Subida JS da mesa concluida', { inputDir, runner: path.basename(uploadScript) });
+        resolve({ ok: true, msg: out || 'Subida JS concluida.' });
       } else {
-        appendAppLog('info', 'Subida da mesa concluida', { inputDir, runner: path.basename(usePy ? pyPath : exePath) });
-        resolve({ ok: true, msg: out || `${path.basename(usePy ? pyPath : exePath)} concluido.` });
+        const parts = [errOut, out].filter(Boolean);
+        appendAppLog('error', 'Falha na subida JS da mesa', { code, inputDir });
+        resolve({ ok: false, msg: parts.join('\n').trim() || `Subida JS terminou com codigo ${code}.` });
       }
     });
   });
