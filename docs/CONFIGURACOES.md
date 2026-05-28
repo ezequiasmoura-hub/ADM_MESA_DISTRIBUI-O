@@ -68,6 +68,14 @@ QUEUE_IDS=queue-id-1,queue-id-2
 
 `QUEUE_ID` singular e aceito como fallback.
 
+Se as filas nao estiverem no mapa padrao do app, informe o estado antes do ID:
+
+```env
+QUEUE_IDS=GO|queue-id-gd-go,MA|queue-id-gd-ma
+```
+
+Na consulta da mesa, o app usa somente o ID. O prefixo `GO|` serve para a interface identificar o estado.
+
 ## Pastas locais
 
 ### `INPUT_MESA_DIR`
@@ -131,7 +139,13 @@ IDs de fila usados pela limpeza por estado/fila quando nao ha filtros detalhados
 CLEANUP_QUEUE_IDS=queue-id-al,queue-id-go
 ```
 
-Na UI, informe um ID por linha.
+Na UI, informe um ID por linha. Para filas fora do padrao de Varejo, use:
+
+```env
+CLEANUP_QUEUE_IDS=GO|queue-id-gd-go,MA|queue-id-gd-ma
+```
+
+Quando `CLEANUP_QUEUE_IDS` fica vazio ou permanece igual ao padrao legado, a limpeza por ID da mesa usa os `QUEUE_IDS` configurados. Isso evita que uma instalacao configurada para GD continue consultando IDs antigos de Varejo.
 
 ### `MESA_DETAIL_RETRIES`
 
@@ -271,6 +285,26 @@ EXTRACAO_HEADLESS=1
 
 Use `0` para diagnostico com navegador visivel.
 
+### `EXTRACAO_BROWSER_CHANNEL`
+
+Canal de navegador usado como fallback pelo Playwright quando o Chromium padrao nao existe na maquina.
+
+```env
+EXTRACAO_BROWSER_CHANNEL=msedge
+```
+
+Valores comuns: `msedge` ou `chrome`.
+
+### `EXTRACAO_CHROMIUM_EXECUTABLE`
+
+Caminho absoluto opcional para um Chromium/Chrome/Edge especifico.
+
+```env
+EXTRACAO_CHROMIUM_EXECUTABLE=C:\Caminho\chrome.exe
+```
+
+Use apenas quando o fallback por canal nao funcionar.
+
 ### `EXTRACAO_BASE_DIR`
 
 Pasta onde os extratores salvam bases.
@@ -335,4 +369,5 @@ LOG_DIR=
 EXTRACAO_USUARIO=usuario_exemplo
 EXTRACAO_SENHA=senha_exemplo
 EXTRACAO_HEADLESS=1
+EXTRACAO_BROWSER_CHANNEL=msedge
 ```

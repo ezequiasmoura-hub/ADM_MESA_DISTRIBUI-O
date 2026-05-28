@@ -148,6 +148,8 @@ No desenvolvimento, usa `node` ou `NODE_BIN`. No app empacotado, quando `NODE_BI
 ELECTRON_RUN_AS_NODE=1
 ```
 
+O processo filho recebe `NODE_PATH` apontando para o `node_modules` empacotado, permitindo que scripts externos apontados na tela usem as mesmas dependencias do projeto. Antes do script, o app carrega `scripts/extracao/playwright-fallback.js` via `--require`; esse preload tenta Edge/Chrome quando o Chromium padrao do Playwright nao existe na maquina instalada.
+
 A UI permite rodar os quatro extratores em concorrencia. Internamente, a execucao em lote usa `Promise.all()` sobre os IDs selecionados.
 
 Logs de extracao ficam em:
@@ -166,6 +168,8 @@ Protecoes:
 - valida modo selecionado;
 - no modo `selected`, usa somente IDs selecionados;
 - no modo `queueIds`, consulta as filas autorizadas para o estado/mesa;
+- `QUEUE_IDS` e `CLEANUP_QUEUE_IDS` respeitam apenas os IDs configurados; os IDs padrao de Varejo entram somente como fallback;
+- filas fora do mapa padrao podem ser cadastradas como `ESTADO|id-da-fila` para o filtro por estado;
 - nao repete sucesso ja processado durante a fila;
 - registra erros por conversa.
 

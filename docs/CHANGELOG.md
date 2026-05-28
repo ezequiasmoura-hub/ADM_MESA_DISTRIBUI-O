@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.3.0 - 2026-05-28
+
+### Correcoes
+
+- Corrigida a montagem de filas para respeitar os IDs configurados sem somar automaticamente as filas padrao de Varejo.
+- A limpeza por ID da mesa agora herda os `QUEUE_IDS` configurados quando `CLEANUP_QUEUE_IDS` ainda estiver com os IDs legados padrao.
+- Conversas de filas configuradas fora do mapa padrao passam a ser reconhecidas pelo `queueId` configurado.
+- Extratores externos passam a receber `NODE_PATH` apontando para as dependencias empacotadas do app.
+- Adicionado fallback do Playwright para tentar Microsoft Edge/Google Chrome quando o Chromium padrao nao estiver disponivel na maquina instalada.
+
+### Melhorias
+
+- `CLEANUP_QUEUE_IDS` aceita linhas no formato `ESTADO|id-da-fila` para mapear filas fora do padrao ao filtro de estado.
+- Adicionado preload `scripts/extracao/playwright-fallback.js` para aplicar fallback de navegador tambem em scripts externos.
+
 ## 2.2.0 - 2026-05-27
 
 ### Alteracoes

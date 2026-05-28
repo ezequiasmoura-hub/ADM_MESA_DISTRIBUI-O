@@ -209,14 +209,88 @@ const DEFAULT_QUEUE_META = {
 };
 const DEFAULT_CLEANUP_QUEUE_IDS = [...LEGACY_MESA_QUEUE_IDS];
 
+function queueConfigLines(raw) {
+  const values = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  return values
+    .flatMap(value => String(value || '').split(/[\n,;]/))
+    .map(value => value.trim())
+    .filter(Boolean);
+}
+
+function parseQueueConfigLine(line) {
+  const parts = String(line || '').split('|').map(part => part.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  if (parts.length === 1) return { id: parts[0], empresa: '', nome: '' };
+  return {
+    empresa: parts[0].toUpperCase(),
+    nome: parts.length > 2 ? parts.slice(1, -1).join(' | ') : '',
+    id: parts[parts.length - 1],
+  };
+}
+
+function queueEntriesFrom(raw) {
+  const seen = new Set();
+  const entries = [];
+  for (const line of queueConfigLines(raw)) {
+    const entry = parseQueueConfigLine(line);
+    if (!entry?.id || seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    entries.push(entry);
+  }
+  return entries;
+}
+
+function normalizeQueueIdList(raw) {
+  return queueEntriesFrom(raw).map(entry => entry.id);
+}
+
+function sameQueueSet(a, b) {
+  const left = [...new Set(normalizeQueueIdList(a))].sort();
+  const right = [...new Set(normalizeQueueIdList(b))].sort();
+  return left.length === right.length && left.every((id, index) => id === right[index]);
+}
+
+function isDefaultCleanupQueueList(raw) {
+  return sameQueueSet(raw, DEFAULT_CLEANUP_QUEUE_IDS);
+}
+
 function getQueueIds() {
-  const configured = (CONFIG.QUEUE_IDS || []).map(id => id && id.toString().trim()).filter(Boolean);
-  return [...new Set([...configured, ...Object.keys(DEFAULT_QUEUE_META)])];
+  const configured = normalizeQueueIdList(CONFIG.QUEUE_IDS);
+  return configured.length ? configured : Object.keys(DEFAULT_QUEUE_META);
 }
 
 function getCleanupQueueIds() {
-  const raw = Array.isArray(CONFIG.CLEANUP_QUEUE_IDS) ? CONFIG.CLEANUP_QUEUE_IDS : DEFAULT_CLEANUP_QUEUE_IDS;
-  return [...new Set(raw.map(id => id && id.toString().trim()).filter(Boolean))];
+  const cleanup = normalizeQueueIdList(CONFIG.CLEANUP_QUEUE_IDS);
+  const primary = normalizeQueueIdList(CONFIG.QUEUE_IDS);
+  if (cleanup.length && !isDefaultCleanupQueueList(cleanup)) return cleanup;
+  if (primary.length && !isDefaultCleanupQueueList(primary)) return primary;
+  if (cleanup.length) return cleanup;
+  return primary.length ? primary : [...DEFAULT_CLEANUP_QUEUE_IDS];
+}
+
+function queueConfigDisplayLines(raw, effectiveIds) {
+  const lines = queueConfigLines(raw);
+  if (lines.length && !isDefaultCleanupQueueList(lines)) return lines;
+  return effectiveIds || [];
+}
+
+function getQueueMeta(queueId) {
+  const configuredEntries = [
+    ...queueEntriesFrom(CONFIG.QUEUE_IDS),
+    ...queueEntriesFrom(CONFIG.CLEANUP_QUEUE_IDS),
+  ];
+  const configured = configuredEntries.reverse().find(entry => entry.id === queueId);
+  const fallback = DEFAULT_QUEUE_META[queueId] || {};
+  return {
+    empresa: configured?.empresa || fallback.empresa || '',
+    nome: configured?.nome || fallback.nome || '',
+  };
+}
+
+function isConfiguredQueueId(queueId) {
+  if (!queueId) return false;
+  const ids = new Set([...getQueueIds(), ...getCleanupQueueIds(), ...Object.keys(DEFAULT_QUEUE_META)]);
+  return ids.has(queueId);
 }
 
 function ensureDir(dir) {
@@ -270,7 +344,8 @@ function createPublicConfig() {
     MESA_UPLOAD_CREDENTIALS: '',
     MESA_UPLOAD_CREDENTIALS_CONFIGURED: countMesaUploadCredentials(CONFIG.MESA_UPLOAD_CREDENTIALS),
     EXTRACTION_CREDENTIALS: extractionCredentials,
-    QUEUE_IDS: getQueueIds(),
+    QUEUE_IDS: queueConfigDisplayLines(CONFIG.QUEUE_IDS, getQueueIds()),
+    CLEANUP_QUEUE_IDS: queueConfigDisplayLines(CONFIG.CLEANUP_QUEUE_IDS, getCleanupQueueIds()),
     INPUT_MESA_DIR_EFFECTIVE: getInputMesaDir(),
     LOG_DIR_EFFECTIVE: getLogDir(),
   };
@@ -285,6 +360,23 @@ function getNodeExecution() {
     return { command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } };
   }
   return { command: configured || 'node', env: {} };
+}
+
+function getBundledNodeModulesDir() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'node_modules')
+    : path.join(__dirname, 'node_modules');
+}
+
+function mergeNodePath(...dirs) {
+  return [...dirs, process.env.NODE_PATH]
+    .filter(Boolean)
+    .join(path.delimiter);
+}
+
+function getExtractionNodeArgs() {
+  const preload = path.join(__dirname, 'scripts', 'extracao', 'playwright-fallback.js');
+  return fs.existsSync(preload) ? ['--require', preload] : [];
 }
 
 function normalizePathCompare(p) {
@@ -331,8 +423,9 @@ function normalizeConfigAfterLoad() {
       password: current.password || defaults.password || '',
     };
   }
+  CONFIG.QUEUE_IDS = queueConfigLines(CONFIG.QUEUE_IDS);
   if (!Array.isArray(CONFIG.CLEANUP_QUEUE_IDS)) CONFIG.CLEANUP_QUEUE_IDS = [...DEFAULT_CLEANUP_QUEUE_IDS];
-  CONFIG.CLEANUP_QUEUE_IDS = [...new Set(CONFIG.CLEANUP_QUEUE_IDS.map(id => id && id.toString().trim()).filter(Boolean))];
+  CONFIG.CLEANUP_QUEUE_IDS = queueConfigLines(CONFIG.CLEANUP_QUEUE_IDS);
   CONFIG.MESA_UPLOAD_STRATEGY = ['paced', 'batch', 'serial'].includes(CONFIG.MESA_UPLOAD_STRATEGY)
     ? CONFIG.MESA_UPLOAD_STRATEGY
     : 'paced';
@@ -380,7 +473,7 @@ function resolveCleanupQueueIds(filtros = {}) {
   const allowedQueueIds = getCleanupQueueIds();
   if (!states.length) return allowedQueueIds;
   const wanted = new Set(states);
-  return allowedQueueIds.filter(id => wanted.has(DEFAULT_QUEUE_META[id]?.empresa || ''));
+  return allowedQueueIds.filter(id => wanted.has(getQueueMeta(id).empresa || ''));
 }
 
 function normalizeKeyName(k) {
@@ -440,11 +533,11 @@ function extractQueueIdFromConversation(conv, fallbackQueueId = '') {
   const direct = fallbackQueueId || '';
   if (direct) return direct;
   for (const participant of conv?.participants || []) {
-    if (participant.queueId && DEFAULT_QUEUE_META[participant.queueId]) return participant.queueId;
+    if (participant.queueId && isConfiguredQueueId(participant.queueId)) return participant.queueId;
     for (const session of participant.sessions || []) {
-      if (session.queueId && DEFAULT_QUEUE_META[session.queueId]) return session.queueId;
+      if (session.queueId && isConfiguredQueueId(session.queueId)) return session.queueId;
       for (const segment of session.segments || []) {
-        if (segment.queueId && DEFAULT_QUEUE_META[segment.queueId]) return segment.queueId;
+        if (segment.queueId && isConfiguredQueueId(segment.queueId)) return segment.queueId;
       }
     }
   }
@@ -456,7 +549,7 @@ function extractQueueIdFromConversation(conv, fallbackQueueId = '') {
 function mapMesaRecord(conv, conversationId, fallbackQueueId = '') {
   const attrs = collectConversationAttributes(conv);
   const queueId = extractQueueIdFromConversation(conv, fallbackQueueId);
-  const meta = DEFAULT_QUEUE_META[queueId] || {};
+  const meta = getQueueMeta(queueId);
   const protocolo = extractProtocolFromConversation(conv);
   const tipoServico = getAttr(attrs, ['tipo_de_servico', 'tipoServico', 'tipo de servico', 'servico', 'descricao']);
   const status = getAttr(attrs, ['status', 'situacao', 'coluna']);
@@ -510,11 +603,12 @@ function chunkArray(items, size) {
 }
 
 function buildMesaDetailErrorRecord(conversationId, queueId, msg) {
+  const meta = getQueueMeta(queueId);
   return {
     conversationId,
     protocolo: '',
     tipoServico: '',
-    empresa: DEFAULT_QUEUE_META[queueId]?.empresa || '',
+    empresa: meta.empresa || '',
     prazo: '',
     status: 'ERRO_CONSULTA',
     data: '',
@@ -523,7 +617,7 @@ function buildMesaDetailErrorRecord(conversationId, queueId, msg) {
     fluxo: '',
     prioridade: '',
     queueId,
-    queueName: DEFAULT_QUEUE_META[queueId]?.nome || queueId,
+    queueName: meta.nome || queueId,
     error: msg,
   };
 }
@@ -563,19 +657,20 @@ async function getMesaRecordWithRetry(conversationsApi, conversationId, queueId,
 }
 
 async function getMesaProtocolRecordFast(analyticsApi, conversationId, queueId) {
+  const meta = getQueueMeta(queueId);
   try {
     const conv = await analyticsApi.getAnalyticsConversationDetails(conversationId);
     return {
       conversationId,
       queueId,
-      empresa: DEFAULT_QUEUE_META[queueId]?.empresa || '',
+      empresa: meta.empresa || '',
       protocolo: extractProtocolFromConversation(conv),
     };
   } catch (e) {
     return {
       conversationId,
       queueId,
-      empresa: DEFAULT_QUEUE_META[queueId]?.empresa || '',
+      empresa: meta.empresa || '',
       protocolo: '',
       error: e.message || String(e),
     };
@@ -586,7 +681,7 @@ async function getMesaProtocolRecordsBulk(analyticsApi, conversations, onProgres
   const recordsById = new Map(conversations.map(c => [c.conversationId, {
     conversationId: c.conversationId,
     queueId: c.queueId,
-    empresa: DEFAULT_QUEUE_META[c.queueId]?.empresa || '',
+    empresa: getQueueMeta(c.queueId).empresa || '',
     protocolo: '',
   }]));
 
@@ -637,21 +732,24 @@ async function getMesaProtocolRecordsBulk(analyticsApi, conversations, onProgres
 }
 
 async function getMesaAnalyticsRecordsBulk(analyticsApi, conversations, onProgress = null) {
-  const recordsById = new Map(conversations.map(c => [c.conversationId, {
-    conversationId: c.conversationId,
-    protocolo: '',
-    tipoServico: '',
-    empresa: DEFAULT_QUEUE_META[c.queueId]?.empresa || '',
-    prazo: '',
-    status: '',
-    data: '',
-    origem: '',
-    skill: '',
-    fluxo: '',
-    prioridade: '',
-    queueId: c.queueId,
-    queueName: DEFAULT_QUEUE_META[c.queueId]?.nome || c.queueId,
-  }]));
+  const recordsById = new Map(conversations.map(c => {
+    const meta = getQueueMeta(c.queueId);
+    return [c.conversationId, {
+      conversationId: c.conversationId,
+      protocolo: '',
+      tipoServico: '',
+      empresa: meta.empresa || '',
+      prazo: '',
+      status: '',
+      data: '',
+      origem: '',
+      skill: '',
+      fluxo: '',
+      prioridade: '',
+      queueId: c.queueId,
+      queueName: meta.nome || c.queueId,
+    }];
+  }));
 
   const days = Math.max(1, Math.min(31, Number(CONFIG.MESA_PROTOCOL_INTERVAL_DAYS) || 30));
   const end = new Date();
@@ -789,13 +887,14 @@ async function consultarMesaPorQueueIds(queueIds) {
   for (const result of activityResponse.results || []) {
     const conversationId = result.group?.conversationId;
     const queueId = result.group?.queueId || '';
+    const meta = getQueueMeta(queueId);
     if (!conversationId || seen.has(conversationId)) continue;
     seen.add(conversationId);
     records.push({
       conversationId,
       queueId,
-      empresa: DEFAULT_QUEUE_META[queueId]?.empresa || '',
-      queueName: DEFAULT_QUEUE_META[queueId]?.nome || queueId,
+      empresa: meta.empresa || '',
+      queueName: meta.nome || queueId,
     });
   }
 
@@ -921,11 +1020,16 @@ function runExtractionScript(id) {
     appendExtractionLogFile(logPath, `[${new Date().toISOString()}] ${script.label}\n`);
     appendExtractionLogFile(logPath, `runtime=${runtime}\nscript=${scriptPath}\ncwd=${cwd}\n\n`);
 
-    const child = spawn(runtime, [scriptPath], {
+    const child = spawn(runtime, [...getExtractionNodeArgs(), scriptPath], {
       cwd,
       windowsHide: true,
       shell: false,
-      env: { ...process.env, ...nodeExecution.env, ...getExtractionEnv(id) },
+      env: {
+        ...process.env,
+        ...nodeExecution.env,
+        ...getExtractionEnv(id),
+        NODE_PATH: mergeNodePath(getBundledNodeModulesDir()),
+      },
     });
 
     let outputTail = '';
@@ -1511,13 +1615,19 @@ ipcMain.handle('limpar-mesa', async (_, payload = {}) => {
       return { ok: false, msg: 'Limpeza por ID da mesa so e permitida sem filtros ou apenas com filtro de estado.' };
     }
     queueIds = resolveCleanupQueueIds(filtros);
-    if (!queueIds.length) return { ok: false, msg: 'Nenhum ID de fila configurado para os estados selecionados.' };
+    if (!queueIds.length) {
+      const states = asArray(filtros.empresa).map(s => String(s).trim()).filter(Boolean);
+      const msg = states.length
+        ? 'Nenhum ID de fila configurado para os estados selecionados. Para filas fora do padrao, cadastre os IDs de limpeza como ESTADO|id-da-fila, por exemplo GO|00000000-0000-0000-0000-000000000000.'
+        : 'Nenhum ID de fila configurado para limpeza por ID da mesa.';
+      return { ok: false, msg };
+    }
     const mesaPorFila = await consultarMesaPorQueueIds(queueIds);
     records = mesaPorFila.records || [];
     ids = records.map(r => r.conversationId);
     queueModeInfo = {
       queueIds,
-      estados: [...new Set(queueIds.map(id => DEFAULT_QUEUE_META[id]?.empresa || '').filter(Boolean))],
+      estados: [...new Set(queueIds.map(id => getQueueMeta(id).empresa || '').filter(Boolean))],
       totalFilas: queueIds.length,
       totalEncontrado: ids.length,
     };

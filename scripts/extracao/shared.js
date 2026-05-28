@@ -24,6 +24,8 @@ const PASSWORD = (scriptKey && process.env[`EXTRACAO_${scriptKey}_SENHA`])
   || process.env.RPA_SENHA
   || '';
 const HEADLESS = process.env.EXTRACAO_HEADLESS !== '0';
+const BROWSER_CHANNEL = process.env.EXTRACAO_BROWSER_CHANNEL || process.env.PLAYWRIGHT_CHANNEL || '';
+const CHROMIUM_EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || process.env.EXTRACAO_CHROMIUM_EXECUTABLE || '';
 
 function requireCredentials() {
   if (!USERNAME || !PASSWORD) {
@@ -55,10 +57,38 @@ function toReportDateTime(date = new Date()) {
 }
 
 async function launchChromium(chromium) {
-  return chromium.launch({
+  const launchOptions = {
     headless: HEADLESS,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--window-size=1920,1080'],
-  });
+  };
+
+  if (CHROMIUM_EXECUTABLE) {
+    return chromium.launch({ ...launchOptions, executablePath: CHROMIUM_EXECUTABLE });
+  }
+
+  if (BROWSER_CHANNEL) {
+    return chromium.launch({ ...launchOptions, channel: BROWSER_CHANNEL });
+  }
+
+  try {
+    return await chromium.launch(launchOptions);
+  } catch (firstError) {
+    const channels = ['msedge', 'chrome'];
+    const errors = [firstError?.message || String(firstError)];
+    for (const channel of channels) {
+      try {
+        console.log(`[Playwright] Chromium padrao indisponivel. Tentando canal instalado: ${channel}`);
+        return await chromium.launch({ ...launchOptions, channel });
+      } catch (fallbackError) {
+        errors.push(`${channel}: ${fallbackError?.message || String(fallbackError)}`);
+      }
+    }
+    throw new Error(
+      'Nao foi possivel iniciar um navegador para a extracao do Site Novo. ' +
+      'Instale Microsoft Edge/Google Chrome, configure EXTRACAO_BROWSER_CHANNEL=msedge, ' +
+      'ou rode "npx playwright install chromium" na maquina. Detalhes: ' + errors.join(' | ')
+    );
+  }
 }
 
 async function loginBackoffice(page, baseUrl, label) {

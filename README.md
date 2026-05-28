@@ -148,8 +148,8 @@ Saidas principais:
 
 ```text
 dist/win-unpacked/ADM Mesa de Distribuição.exe
-dist/ADM-Mesa-de-Distribuicao-2.2.0-Setup-x64.exe
-dist/ADM-Mesa-de-Distribuicao-2.2.0-Portable-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.3.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.3.0-Portable-x64.exe
 ```
 
 Detalhes completos em [docs/BUILD_E_EXECUTAVEL.md](docs/BUILD_E_EXECUTAVEL.md).
@@ -172,6 +172,8 @@ Modos:
 
 - **Selecionados**: limpa somente os `conversationId` selecionados na tabela.
 - **Por fila/estado**: quando nao ha filtros ou ha somente filtro de estado, consulta os IDs de fila configurados para o estado e limpa o conjunto confirmado.
+
+Para filas fora do mapa padrao de Varejo, cadastre os IDs como `ESTADO|id-da-fila`, por exemplo `GO|00000000-0000-0000-0000-000000000000`.
 
 O processo registra total encontrado, processadas, sucesso, erro, pendentes, status atual e pausas por rate limit.
 
