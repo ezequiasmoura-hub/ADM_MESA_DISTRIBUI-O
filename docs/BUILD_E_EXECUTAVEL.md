@@ -8,8 +8,8 @@ Este projeto esta configurado para gerar uma aplicacao desktop Windows com Elect
 - O empacotador escolhido foi `electron-builder`, por ser direto para instalador NSIS, portable `.exe`, icone, recursos extras e automacao via `package.json`.
 - A saida atual gera:
   - app unpacked em `dist/win-unpacked/`;
-  - instalador em `dist/ADM-Mesa-de-Distribuicao-2.3.0-Setup-x64.exe`;
-  - portable em `dist/ADM-Mesa-de-Distribuicao-2.3.0-Portable-x64.exe`.
+  - instalador em `dist/ADM-Mesa-de-Distribuicao-2.4.0-Setup-x64.exe`;
+  - portable em `dist/ADM-Mesa-de-Distribuicao-2.4.0-Portable-x64.exe`.
 
 ## Pre-requisitos
 
@@ -91,11 +91,22 @@ npm run dist:win
 Saidas:
 
 ```text
-dist/ADM-Mesa-de-Distribuicao-2.3.0-Setup-x64.exe
-dist/ADM-Mesa-de-Distribuicao-2.3.0-Portable-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.4.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.4.0-Portable-x64.exe
 ```
 
 O instalador cria atalhos e pode permitir escolha de pasta. O portable e melhor para teste rapido ou operacao sem instalacao formal.
+
+Para publicar uma release no GitHub quando houver `GH_TOKEN` configurado no terminal:
+
+```powershell
+$env:GH_TOKEN="token_com_permissao_repo"
+npm run release:github
+```
+
+Sem `GH_TOKEN`, gere com `npm run dist:win` e publique manualmente os arquivos de `dist/` em GitHub Releases. Inclua pelo menos o instalador, o `.blockmap` e o `latest.yml`.
+
+O repositorio tambem possui GitHub Actions em `.github/workflows/release.yml`. Ao enviar uma tag `v*`, o GitHub gera os artefatos e cria/atualiza a Release automaticamente.
 
 ## Configuracao do electron-builder
 

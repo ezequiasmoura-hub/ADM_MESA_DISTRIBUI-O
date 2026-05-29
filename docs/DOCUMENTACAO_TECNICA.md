@@ -158,6 +158,20 @@ Logs de extracao ficam em:
 getLogDir('extracoes')
 ```
 
+## Atualizacoes
+
+O auto-update fica no processo principal (`main.js`) usando `electron-updater`.
+
+Responsabilidades:
+
+- `setupAutoUpdater()`: registra eventos do atualizador;
+- `checkForUpdates()`: consulta GitHub Releases;
+- `downloadUpdate()`: baixa a versao disponivel apos confirmacao do usuario;
+- IPC `get-update-state`, `check-for-updates`, `download-update` e `install-update`: expostos ao renderer via `preload.js`;
+- evento `update-status`: atualiza a barra inferior da interface.
+
+O renderer nao recebe tokens nem acessa GitHub diretamente. A publicacao das releases e feita fora do app, via GitHub Releases ou `npm run release:github` com `GH_TOKEN` apenas no terminal de build.
+
 ## Limpeza
 
 O fluxo principal esta no handler `limpar-mesa`.

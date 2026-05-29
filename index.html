@@ -110,6 +110,19 @@ body {
   transition: var(--trans);
 }
 .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
+.status-action {
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text2);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+.status-action:hover { border-color: var(--accent); color: var(--text); }
+.status-action:disabled { opacity: .55; cursor: default; }
 
 /* ── STATUS BAR ───────────────────────────────────────────────────────────── */
 #statusbar {
@@ -976,7 +989,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
 <div id="titlebar">
   <div class="tb-logo">MD</div>
   <span class="tb-title">Mesa de Distribuição</span>
-  <span class="tb-sub">Backoffice · v2.0</span>
+  <span class="tb-sub" id="appVersionLabel">Backoffice</span>
   <div class="tb-spacer"></div>
   <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">Modo claro</button>
   <div class="tb-btns">
@@ -1001,6 +1014,9 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
   <span id="lastRunLabel">Última execução: —</span>
   <div class="sb-sep"></div>
   <span id="autoCountdown"></span>
+  <div class="sb-sep"></div>
+  <button class="status-action" id="updateActionBtn" onclick="verificarAtualizacao()">Verificar atualizacao</button>
+  <span id="updateStatus">Atualizacao: aguardando</span>
 </div>
 
 <!-- APP -->
@@ -1782,6 +1798,7 @@ const S = {
     lastRemoved: 0,
   },
   runningExtractions: new Set(),
+  updatePromptedVersion: '',
 };
 
 // ─── Init ──────────────────────────────────────────────────────────────────
@@ -1789,6 +1806,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   const cfg = await api.getConfig();
   applyConfigToUI(cfg);
   syncFilterTagsFromState();
+
+  if (api.getUpdateState) {
+    const update = await api.getUpdateState();
+    renderUpdateState(update);
+  }
 
   // Escuta status do Genesys vindo do processo principal durante a geração
   api.onGenesysStatus(({ ok, total, protocolos, region, msg }) => {
@@ -1819,6 +1841,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   if (api.onCleanupProgress) {
     api.onCleanupProgress(updateCleanupProgress);
+  }
+
+  if (api.onUpdateStatus) {
+    api.onUpdateStatus(handleUpdateStatus);
   }
 });
 
@@ -2882,6 +2908,65 @@ function setProcessStatus(type, msg) {
   const dot = document.getElementById('processDot');
   dot.className = 'sb-dot ' + type;
   document.getElementById('processStatus').textContent = msg;
+}
+
+function renderUpdateState(state = {}) {
+  const label = document.getElementById('updateStatus');
+  const btn = document.getElementById('updateActionBtn');
+  const version = document.getElementById('appVersionLabel');
+  if (version && state.currentVersion) version.textContent = `Backoffice · v${state.currentVersion}`;
+  if (!label || !btn) return;
+
+  const status = state.status || 'idle';
+  const latest = state.latestVersion ? ` v${state.latestVersion}` : '';
+  const percent = status === 'downloading' ? ` (${state.percent || 0}%)` : '';
+  const textByStatus = {
+    idle: 'Atualizacao: aguardando',
+    checking: 'Atualizacao: verificando...',
+    available: `Atualizacao disponivel${latest}`,
+    downloading: `Baixando atualizacao${percent}`,
+    downloaded: 'Atualizacao baixada',
+    'not-available': 'Atualizacao: versao atual',
+    error: `Atualizacao: ${state.msg || 'erro'}`,
+    dev: 'Atualizacao: apenas no app instalado',
+    unavailable: `Atualizacao: ${state.msg || 'indisponivel'}`,
+  };
+
+  label.textContent = textByStatus[status] || state.msg || 'Atualizacao: aguardando';
+  btn.disabled = status === 'checking' || status === 'downloading';
+  if (status === 'available') btn.textContent = 'Baixar atualizacao';
+  else if (status === 'downloaded') btn.textContent = 'Instalar agora';
+  else btn.textContent = 'Verificar atualizacao';
+}
+
+async function handleUpdateStatus(state = {}) {
+  renderUpdateState(state);
+  if (state.status === 'available' && state.latestVersion !== S.updatePromptedVersion) {
+    S.updatePromptedVersion = state.latestVersion || 'nova';
+    const ok = confirm(`Nova versao disponivel${state.latestVersion ? ': ' + state.latestVersion : ''}.\n\nDeseja baixar agora?`);
+    if (ok) await baixarAtualizacao();
+  } else if (state.status === 'downloaded') {
+    const ok = confirm('Atualizacao baixada.\n\nDeseja reiniciar o app agora para instalar?');
+    if (ok) await api.installUpdate();
+  } else if (state.status === 'error' && state.msg) {
+    toast(state.msg, 'err');
+  }
+}
+
+async function verificarAtualizacao() {
+  const state = await api.getUpdateState?.();
+  if (state?.status === 'available') return baixarAtualizacao();
+  if (state?.status === 'downloaded') return api.installUpdate();
+  const res = await api.checkForUpdates();
+  renderUpdateState(res);
+  if (res?.status === 'not-available' || res?.status === 'dev') toast(res.msg || 'Nenhuma atualizacao disponivel.', 'inf');
+  if (res?.status === 'error') toast(res.msg || 'Erro ao verificar atualizacao.', 'err');
+}
+
+async function baixarAtualizacao() {
+  const res = await api.downloadUpdate();
+  renderUpdateState(res);
+  if (res?.status === 'error') toast(res.msg || 'Erro ao baixar atualizacao.', 'err');
 }
 
 function toast(msg, type = 'ok') {

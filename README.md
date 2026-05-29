@@ -148,11 +148,19 @@ Saidas principais:
 
 ```text
 dist/win-unpacked/ADM Mesa de Distribuição.exe
-dist/ADM-Mesa-de-Distribuicao-2.3.0-Setup-x64.exe
-dist/ADM-Mesa-de-Distribuicao-2.3.0-Portable-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.4.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.4.0-Portable-x64.exe
 ```
 
 Detalhes completos em [docs/BUILD_E_EXECUTAVEL.md](docs/BUILD_E_EXECUTAVEL.md).
+
+## Atualizacoes automaticas
+
+A partir da versao `2.4.0`, o app instalado verifica atualizacoes em GitHub Releases ao abrir e tambem pelo botao **Verificar atualizacao** na barra inferior. A primeira instalacao dessa versao ainda precisa ser feita manualmente em maquinas que estavam em versoes antigas.
+
+O auto-update usa `electron-updater` e depende dos artefatos publicados em Releases do repositorio GitHub configurado. Veja [docs/ATUALIZACOES.md](docs/ATUALIZACOES.md).
+
+Para publicar uma nova versao, envie uma tag `v*` para o GitHub. O workflow `.github/workflows/release.yml` gera a Release automaticamente.
 
 ## Como usar
 

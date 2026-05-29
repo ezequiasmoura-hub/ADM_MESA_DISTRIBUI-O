@@ -9,6 +9,10 @@ contextBridge.exposeInMainWorld('api', {
   // Config
   getConfig: ()      => ipcRenderer.invoke('get-config'),
   setConfig: (cfg)   => ipcRenderer.invoke('set-config', cfg),
+  getUpdateState: () => ipcRenderer.invoke('get-update-state'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates', true),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
 
   // Diálogos
   pickFile:   (filters) => ipcRenderer.invoke('pick-file', filters),
@@ -37,4 +41,5 @@ contextBridge.exposeInMainWorld('api', {
   onGenesysStatus: (cb) => ipcRenderer.on('genesys-status', (_, d) => cb(d)),
   onExtracaoLog:   (cb) => ipcRenderer.on('extraction-log', (_, d) => cb(d)),
   onCleanupProgress: (cb) => ipcRenderer.on('cleanup-progress', (_, d) => cb(d)),
+  onUpdateStatus:  (cb) => ipcRenderer.on('update-status',  (_, d) => cb(d)),
 });

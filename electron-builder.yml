@@ -3,6 +3,12 @@ productName: ADM Mesa de Distribuição
 copyright: Copyright © 2026 BackOffice
 asar: false
 
+publish:
+  - provider: github
+    owner: ezequiasmoura-hub
+    repo: ADM_MESA_DISTRIBUI-O
+    releaseType: release
+
 directories:
   output: dist
   buildResources: assets

@@ -1,7 +1,7 @@
 {
   "name": "mesa-distribuicao-bko",
   "productName": "ADM Mesa de Distribuição",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "ADM Mesa de Distribuicao - Painel desktop Backoffice",
   "main": "main.js",
   "author": "BackOffice",
@@ -15,6 +15,7 @@
     "build": "npm run check && electron-builder --dir",
     "dist": "npm run dist:win",
     "dist:win": "npm run check && electron-builder --win --x64",
+    "release:github": "npm run check && electron-builder --win --x64 --publish always",
     "dist:win:portable": "npm run check && electron-builder --win portable --x64",
     "extract:site-novo": "node scripts/extracao/site-novo.js",
     "extract:site-antigo": "node scripts/extracao/site-antigo.js",
@@ -26,6 +27,7 @@
   "dependencies": {
     "cheerio": "^1.2.0",
     "dotenv": "^16.4.5",
+    "electron-updater": "^6.8.3",
     "fs-extra": "^11.3.3",
     "playwright": "^1.58.0",
     "purecloud-platform-client-v2": "^227.0.0",

@@ -2,6 +2,12 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const { spawn } = require('child_process');
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch (_) {
+  autoUpdater = null;
+}
 
 // ── Carrega .env da pasta do projeto e do inputMesa como fallback ─────────────
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -13,6 +19,14 @@ let mainWindow;
 let autoTimer = null;
 const runningExtractions = new Set();
 const IS_SMOKE_TEST = process.argv.includes('--smoke-test');
+let updateCheckInProgress = false;
+const updateState = {
+  status: 'idle',
+  currentVersion: app.getVersion(),
+  latestVersion: '',
+  percent: 0,
+  msg: 'Atualizacoes automaticas aguardando.',
+};
 
 // ── Genesys: conecta usando EXATAMENTE o mesmo método do index.js funcional ──
 // platformClient.PureCloudRegionHosts[ORG_REGION] é o enum correto do SDK
@@ -1292,6 +1306,123 @@ function applyConfigPatch(newCfg = {}) {
   saveConfig();
 }
 
+function publicUpdateState(extra = {}) {
+  return {
+    ...updateState,
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    ...extra,
+  };
+}
+
+function emitUpdateStatus(payload = {}) {
+  Object.assign(updateState, payload, { currentVersion: app.getVersion() });
+  appendAppLog('info', 'Status de atualizacao', updateState);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-status', publicUpdateState());
+  }
+  return publicUpdateState();
+}
+
+function updaterErrorMessage(error) {
+  const msg = error?.message || String(error || 'Erro desconhecido');
+  if (/404|not found/i.test(msg)) return 'Nenhuma release de atualizacao foi encontrada no GitHub.';
+  if (/private|authentication|401|403|token/i.test(msg)) {
+    return 'Nao foi possivel acessar a release. Se o repositorio for privado, publique em um canal acessivel ou configure uma estrategia segura de distribuicao.';
+  }
+  return msg;
+}
+
+function setupAutoUpdater() {
+  if (!autoUpdater) {
+    emitUpdateStatus({ status: 'unavailable', msg: 'electron-updater nao esta disponivel neste pacote.' });
+    return;
+  }
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowPrerelease = false;
+
+  autoUpdater.on('checking-for-update', () => {
+    emitUpdateStatus({ status: 'checking', percent: 0, msg: 'Verificando atualizacoes...' });
+  });
+
+  autoUpdater.on('update-available', info => {
+    emitUpdateStatus({
+      status: 'available',
+      latestVersion: info?.version || '',
+      percent: 0,
+      msg: `Atualizacao ${info?.version || ''} disponivel.`,
+    });
+  });
+
+  autoUpdater.on('update-not-available', info => {
+    emitUpdateStatus({
+      status: 'not-available',
+      latestVersion: info?.version || app.getVersion(),
+      percent: 0,
+      msg: 'Voce ja esta na versao mais recente.',
+    });
+  });
+
+  autoUpdater.on('download-progress', progress => {
+    const percent = Math.round(Number(progress?.percent || 0));
+    emitUpdateStatus({ status: 'downloading', percent, msg: `Baixando atualizacao: ${percent}%` });
+  });
+
+  autoUpdater.on('update-downloaded', info => {
+    emitUpdateStatus({
+      status: 'downloaded',
+      latestVersion: info?.version || updateState.latestVersion || '',
+      percent: 100,
+      msg: 'Atualizacao baixada. Reinicie para instalar.',
+    });
+  });
+
+  autoUpdater.on('error', error => {
+    emitUpdateStatus({ status: 'error', msg: updaterErrorMessage(error) });
+  });
+}
+
+async function checkForUpdates(manual = false) {
+  if (!app.isPackaged) {
+    return emitUpdateStatus({ status: 'dev', msg: 'Atualizacao automatica funciona apenas no app instalado.' });
+  }
+  if (!autoUpdater) {
+    return emitUpdateStatus({ status: 'unavailable', msg: 'Atualizador nao disponivel neste pacote.' });
+  }
+  if (updateCheckInProgress) {
+    return publicUpdateState({ msg: 'Verificacao de atualizacao ja esta em andamento.' });
+  }
+
+  updateCheckInProgress = true;
+  try {
+    emitUpdateStatus({ status: 'checking', msg: manual ? 'Verificando atualizacao...' : 'Verificacao automatica iniciada...' });
+    await autoUpdater.checkForUpdates();
+    return publicUpdateState();
+  } catch (error) {
+    return emitUpdateStatus({ status: 'error', msg: updaterErrorMessage(error) });
+  } finally {
+    updateCheckInProgress = false;
+  }
+}
+
+async function downloadUpdate() {
+  if (!app.isPackaged || !autoUpdater) {
+    return emitUpdateStatus({ status: 'unavailable', msg: 'Download de atualizacao disponivel apenas no app instalado.' });
+  }
+  if (updateState.status !== 'available') {
+    return publicUpdateState({ msg: 'Nenhuma atualizacao disponivel para baixar.' });
+  }
+  try {
+    emitUpdateStatus({ status: 'downloading', percent: 0, msg: 'Iniciando download da atualizacao...' });
+    await autoUpdater.downloadUpdate();
+    return publicUpdateState();
+  } catch (error) {
+    return emitUpdateStatus({ status: 'error', msg: updaterErrorMessage(error) });
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -1324,11 +1455,14 @@ app.whenReady().then(() => {
     logDir: getLogDir(),
   });
   createWindow();
+  setupAutoUpdater();
   if (IS_SMOKE_TEST) {
     setTimeout(() => {
       appendAppLog('info', 'Smoke test finalizado');
       app.quit();
     }, 1500);
+  } else if (app.isPackaged) {
+    setTimeout(() => checkForUpdates(false), 5000);
   }
 });
 
@@ -1345,6 +1479,17 @@ ipcMain.on('win-maximize', () => mainWindow.isMaximized() ? mainWindow.unmaximiz
 // ─── IPC: config ─────────────────────────────────────────────────────────────
 ipcMain.handle('get-config', () => createPublicConfig());
 ipcMain.handle('set-config', (_, newCfg) => { applyConfigPatch(newCfg); return true; });
+ipcMain.handle('get-update-state', () => publicUpdateState());
+ipcMain.handle('check-for-updates', (_, manual = true) => checkForUpdates(manual));
+ipcMain.handle('download-update', () => downloadUpdate());
+ipcMain.handle('install-update', () => {
+  if (updateState.status !== 'downloaded' || !autoUpdater) {
+    return publicUpdateState({ msg: 'Nenhuma atualizacao baixada para instalar.' });
+  }
+  appendAppLog('info', 'Instalando atualizacao baixada');
+  autoUpdater.quitAndInstall(false, true);
+  return publicUpdateState({ msg: 'Reiniciando para instalar atualizacao...' });
+});
 
 ipcMain.handle('pick-file', async (_, filters) => {
   const r = await dialog.showOpenDialog(mainWindow, { properties: ['openFile'], filters });

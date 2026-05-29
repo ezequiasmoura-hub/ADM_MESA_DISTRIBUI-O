@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.4.0 - 2026-05-29
+
+### Alteracoes
+
+- Adicionado auto-update com `electron-updater`.
+- Configurado `electron-builder` para publicar atualizacoes via GitHub Releases no repositorio `ezequiasmoura-hub/ADM_MESA_DISTRIBUI-O`.
+- Adicionado botao **Verificar atualizacao** na barra inferior do app.
+- O app instalado verifica atualizacoes automaticamente ao abrir.
+- Adicionado script `npm run release:github` para publicar releases quando `GH_TOKEN` estiver configurado.
+
+### Observacoes
+
+- Maquinas que ainda estao em versoes anteriores precisam instalar manualmente a `2.4.0` uma vez. Depois disso, as proximas versoes passam a ser detectadas pelo app.
+- O auto-update depende dos artefatos publicados em GitHub Releases, incluindo `latest.yml` e `.blockmap`.
+
 ## 2.3.0 - 2026-05-28
 
 ### Correcoes
