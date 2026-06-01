@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.6.0 - 2026-06-01
+
+### Correcoes
+
+- Aba de limpeza passa a complementar detalhes individuais apenas dos registros que continuam sem protocolo, tipo, prazo ou estado apos a consulta analitica e o cruzamento com as bases.
+- Leitura de atributos Genesys ficou mais robusta, coletando `attributes`, `participantData` e `variables` em estruturas aninhadas.
+- Filtros da limpeza recebem mais campos preenchidos antes de consultar detalhes em tempo real.
+
+### Melhorias
+
+- Pool de credenciais da limpeza passa a vir ativado por padrao em novas configuracoes.
+- Consulta da limpeza evita leituras individuais desnecessarias, reduzindo tempo quando a base local ja possui os dados de filtro.
+
 ## 2.5.0 - 2026-06-01
 
 ### Melhorias

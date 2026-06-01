@@ -153,7 +153,9 @@ let CONFIG = {
   CLEANUP_RATE_LIMIT_PER_MINUTE: Math.max(1, envNumber('CLEANUP_RATE_LIMIT_PER_MINUTE', 280)),
   CLEANUP_RATE_LIMIT_FALLBACK_SECONDS: Math.max(1, envNumber('CLEANUP_RATE_LIMIT_FALLBACK_SECONDS', 30)),
   CLEANUP_START_INTERVAL_MS: Math.max(0, envNumber('CLEANUP_START_INTERVAL_MS', 0)),
-  CLEANUP_USE_UPLOAD_CREDENTIALS: ['1', 'true', 'sim', 'yes'].includes(String(process.env.CLEANUP_USE_UPLOAD_CREDENTIALS || '').toLowerCase()),
+  CLEANUP_USE_UPLOAD_CREDENTIALS: process.env.CLEANUP_USE_UPLOAD_CREDENTIALS === undefined
+    ? true
+    : ['1', 'true', 'sim', 'yes'].includes(String(process.env.CLEANUP_USE_UPLOAD_CREDENTIALS || '').toLowerCase()),
   CLEANUP_MAX_CREDENTIALS: Math.max(1, Math.min(20, envNumber('CLEANUP_MAX_CREDENTIALS', 6))),
   CLEANUP_QUEUE_IDS: process.env.CLEANUP_QUEUE_IDS
     ? process.env.CLEANUP_QUEUE_IDS.split(',').map(s => s.trim()).filter(Boolean)
@@ -559,16 +561,36 @@ function formatDateTimeBR(value) {
 
 function collectConversationAttributes(conv) {
   const attrs = {};
-  for (const p of conv?.participants || []) {
-    if (p?.attributes && typeof p.attributes === 'object') Object.assign(attrs, p.attributes);
+
+  function mergeBag(bag) {
+    for (const [key, value] of Object.entries(bag || {})) {
+      if (value === null || value === undefined) continue;
+      if (typeof value === 'object') continue;
+      attrs[key] = value;
+    }
   }
+
+  function visit(value, depth = 0) {
+    if (!value || depth > 8 || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      value.forEach(item => visit(item, depth + 1));
+      return;
+    }
+    if (value.attributes && typeof value.attributes === 'object') mergeBag(value.attributes);
+    if (value.participantData && typeof value.participantData === 'object') mergeBag(value.participantData);
+    if (value.variables && typeof value.variables === 'object') mergeBag(value.variables);
+    for (const child of Object.values(value)) visit(child, depth + 1);
+  }
+
+  visit(conv);
   return attrs;
 }
 
 function getAttr(attrs, possibleKeys) {
   const wanted = possibleKeys.map(normalizeKeyName);
   for (const [k, v] of Object.entries(attrs || {})) {
-    if (wanted.includes(normalizeKeyName(k))) return v || '';
+    const key = normalizeKeyName(k);
+    if (wanted.includes(key) || wanted.some(w => key.endsWith(w) || key.includes(w))) return v || '';
   }
   return '';
 }
@@ -616,10 +638,10 @@ function mapMesaRecord(conv, conversationId, fallbackQueueId = '') {
   const queueId = extractQueueIdFromConversation(conv, fallbackQueueId);
   const meta = getQueueMeta(queueId);
   const protocolo = extractProtocolFromConversation(conv);
-  const tipoServico = getAttr(attrs, ['tipo_de_servico', 'tipoServico', 'tipo de servico', 'servico', 'descricao']);
-  const status = getAttr(attrs, ['status', 'situacao', 'coluna']);
-  const prazo = getAttr(attrs, ['conclusao_desejada', 'conclusaoDesejada', 'prazo', 'dataPrazo']);
-  const data = getAttr(attrs, ['data', 'dataabertura', 'data de abertura', 'criadoem', 'createdat']);
+  const tipoServico = getAttr(attrs, ['tipo_de_servico', 'tipoServico', 'tipo de servico', 'servico', 'descricao', 'fixedTipoServico']);
+  const status = getAttr(attrs, ['status', 'situacao', 'coluna', 'statusmesa']);
+  const prazo = getAttr(attrs, ['conclusao_desejada', 'conclusaoDesejada', 'prazo', 'dataPrazo', 'status_prazo_mesa', 'statusPrazoMesa']);
+  const data = getAttr(attrs, ['data', 'dataabertura', 'data de abertura', 'criadoem', 'createdat', 'conversationStart']);
   const origem = getAttr(attrs, ['dados', 'origem', 'fonte', 'site']);
   const skill = getAttr(attrs, ['skill']);
   const fluxo = getAttr(attrs, ['fluxo']);
@@ -865,6 +887,13 @@ function mergeMesaRecords(base, detail) {
   return merged;
 }
 
+function recordNeedsCleanupDetail(record) {
+  return !normProtocolo(record?.protocolo)
+    || !record?.tipoServico
+    || !record?.prazo
+    || !record?.empresa;
+}
+
 async function consultarMesaGenesys({ includeDetails = true, protocolOnly = false, onProgress = null } = {}) {
   const platformClient = require('purecloud-platform-client-v2');
   if (!CONFIG.CLIENT_ID || !CONFIG.CLIENT_SECRET) throw new Error('Credenciais Genesys nao configuradas.');
@@ -903,6 +932,8 @@ async function consultarMesaGenesys({ includeDetails = true, protocolOnly = fals
 
   if (onProgress) onProgress(`${conversations.length} conversa(s) na mesa. Lendo dados analiticos em lote...`);
   const baseRecords = await getMesaAnalyticsRecordsBulk(analyticsApi, conversations, onProgress);
+  const sourceIndex = buildMesaSourceEnrichmentIndex(onProgress);
+  let records = enrichMesaRecordsFromSourceIndex(baseRecords, sourceIndex.index).records;
 
   const detailCredentialServices = createCleanupCredentialServices({
     onRateLimit: (seconds, credentialName) => onProgress
@@ -916,14 +947,17 @@ async function consultarMesaGenesys({ includeDetails = true, protocolOnly = fals
     : 12;
   let detailServiceIndex = 0;
 
+  const detailTargets = records.filter(recordNeedsCleanupDetail);
   if (onProgress) {
-    onProgress(detailCredentialServices?.length
-      ? `Enriquecendo dados da mesa com ${detailCredentialServices.length} credencial(is), paralelo ${detailConcurrency}...`
-      : 'Enriquecendo dados da mesa com uma leitura em tempo real, sem retry longo...');
+    onProgress(detailTargets.length
+      ? (detailCredentialServices?.length
+          ? `Complementando ${detailTargets.length} conversa(s) sem dados com ${detailCredentialServices.length} credencial(is), paralelo ${detailConcurrency}...`
+          : `Complementando ${detailTargets.length} conversa(s) sem dados com leitura em tempo real...`)
+      : 'Dados da limpeza preenchidos sem leituras individuais extras.');
   }
-  let records = await mapLimit(baseRecords, detailConcurrency, async (base, index) => {
+  const detailRecords = await mapLimit(detailTargets, detailConcurrency, async (base, index) => {
     if (onProgress && (index === 0 || (index + 1) % 100 === 0)) {
-      onProgress(`Enriquecendo detalhes: ${index + 1}/${baseRecords.length}`);
+      onProgress(`Complementando detalhes: ${index + 1}/${detailTargets.length}`);
     }
     try {
       const service = detailServices[detailServiceIndex % detailServices.length];
@@ -937,12 +971,16 @@ async function consultarMesaGenesys({ includeDetails = true, protocolOnly = fals
       return { ...base, error: e.message || String(e) };
     }
   });
+  if (detailRecords.length) {
+    const detailsById = new Map(detailRecords.map(record => [record.conversationId, record]));
+    records = records.map(record => detailsById.get(record.conversationId) || record);
+    records = enrichMesaRecordsFromSourceIndex(records, sourceIndex.index).records;
+  }
 
-  const sourceEnrichment = enrichMesaRecordsWithSourceData(records, onProgress);
-  records = sourceEnrichment.records;
   if (onProgress) {
-    onProgress(`Detalhes preenchidos pela base de origem: ${sourceEnrichment.matched}/${records.length}`);
-    if (sourceEnrichment.errors.length) onProgress(`Avisos ao ler bases: ${sourceEnrichment.errors.slice(0, 3).join(' | ')}`);
+    const semDados = records.filter(recordNeedsCleanupDetail).length;
+    onProgress(`Detalhes preenchidos pela base/API: ${records.length - semDados}/${records.length}`);
+    if (sourceIndex.errors.length) onProgress(`Avisos ao ler bases: ${sourceIndex.errors.slice(0, 3).join(' | ')}`);
   }
 
   return {
@@ -950,9 +988,9 @@ async function consultarMesaGenesys({ includeDetails = true, protocolOnly = fals
     region,
     total: records.length,
     records,
-    totalEnriquecidosOrigem: sourceEnrichment.matched,
-    totalBaseOrigem: sourceEnrichment.totalBase,
-    enrichmentErrors: sourceEnrichment.errors,
+    totalEnriquecidosOrigem: records.filter(r => r.sourceMatched).length,
+    totalBaseOrigem: sourceIndex.index.size,
+    enrichmentErrors: sourceIndex.errors,
   };
 }
 
@@ -2560,10 +2598,7 @@ function mergeMesaRecordFromSource(record, source) {
   return merged;
 }
 
-function enrichMesaRecordsWithSourceData(records, onProgress = null) {
-  if (!records.length) return { records, matched: 0, errors: [], totalBase: 0 };
-  if (onProgress) onProgress('Cruzando protocolos da mesa com as bases de origem para preencher tipo e prazo...');
-  const { index, errors } = buildMesaSourceEnrichmentIndex(onProgress);
+function enrichMesaRecordsFromSourceIndex(records, index) {
   let matched = 0;
   const enriched = records.map(record => {
     const source = index.get(normProtocolo(record.protocolo));
@@ -2571,6 +2606,14 @@ function enrichMesaRecordsWithSourceData(records, onProgress = null) {
     matched++;
     return mergeMesaRecordFromSource(record, source);
   });
+  return { records: enriched, matched };
+}
+
+function enrichMesaRecordsWithSourceData(records, onProgress = null) {
+  if (!records.length) return { records, matched: 0, errors: [], totalBase: 0 };
+  if (onProgress) onProgress('Cruzando protocolos da mesa com as bases de origem para preencher tipo e prazo...');
+  const { index, errors } = buildMesaSourceEnrichmentIndex(onProgress);
+  const { records: enriched, matched } = enrichMesaRecordsFromSourceIndex(records, index);
   return { records: enriched, matched, errors, totalBase: index.size };
 }
 
