@@ -153,6 +153,8 @@ let CONFIG = {
   CLEANUP_RATE_LIMIT_PER_MINUTE: Math.max(1, envNumber('CLEANUP_RATE_LIMIT_PER_MINUTE', 280)),
   CLEANUP_RATE_LIMIT_FALLBACK_SECONDS: Math.max(1, envNumber('CLEANUP_RATE_LIMIT_FALLBACK_SECONDS', 30)),
   CLEANUP_START_INTERVAL_MS: Math.max(0, envNumber('CLEANUP_START_INTERVAL_MS', 0)),
+  CLEANUP_USE_UPLOAD_CREDENTIALS: ['1', 'true', 'sim', 'yes'].includes(String(process.env.CLEANUP_USE_UPLOAD_CREDENTIALS || '').toLowerCase()),
+  CLEANUP_MAX_CREDENTIALS: Math.max(1, Math.min(20, envNumber('CLEANUP_MAX_CREDENTIALS', 6))),
   CLEANUP_QUEUE_IDS: process.env.CLEANUP_QUEUE_IDS
     ? process.env.CLEANUP_QUEUE_IDS.split(',').map(s => s.trim()).filter(Boolean)
     : [...LEGACY_MESA_QUEUE_IDS],
@@ -193,6 +195,8 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'CLEANUP_RATE_LIMIT_PER_MINUTE',
   'CLEANUP_RATE_LIMIT_FALLBACK_SECONDS',
   'CLEANUP_START_INTERVAL_MS',
+  'CLEANUP_USE_UPLOAD_CREDENTIALS',
+  'CLEANUP_MAX_CREDENTIALS',
   'CLEANUP_QUEUE_IDS',
   'AUTO_INTERVAL_MIN',
   'UI_THEME',
@@ -340,6 +344,50 @@ function countMesaUploadCredentials(raw) {
   return text.split(/\r?\n|;/).map(line => line.trim()).filter(Boolean).length;
 }
 
+function parseCredentialLine(line, index) {
+  const parts = String(line || '').split('|').map(part => part.trim());
+  if (parts.length >= 3) {
+    return { name: parts[0] || `CRED_${index + 1}`, clientId: parts[1], clientSecret: parts.slice(2).join('|') };
+  }
+  if (parts.length === 2) {
+    return { name: `CRED_${index + 1}`, clientId: parts[0], clientSecret: parts[1] };
+  }
+  return null;
+}
+
+function parseMesaUploadCredentials(raw = CONFIG.MESA_UPLOAD_CREDENTIALS, includeFallback = true) {
+  const text = String(raw || '').trim();
+  let credentials = [];
+
+  if (text) {
+    if (text.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(text);
+        credentials = Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        credentials = [];
+      }
+    } else {
+      credentials = text
+        .split(/\r?\n|;/)
+        .map((line, index) => parseCredentialLine(line, index))
+        .filter(Boolean);
+    }
+  }
+
+  if (!credentials.length && includeFallback && CONFIG.CLIENT_ID && CONFIG.CLIENT_SECRET) {
+    credentials = [{ name: 'GENESYS', clientId: CONFIG.CLIENT_ID, clientSecret: CONFIG.CLIENT_SECRET }];
+  }
+
+  return credentials
+    .map((cred, index) => ({
+      name: String(cred.name || `CRED_${index + 1}`).trim(),
+      clientId: String(cred.client_id || cred.clientId || '').trim(),
+      clientSecret: String(cred.client_secret || cred.clientSecret || '').trim(),
+    }))
+    .filter(cred => cred.clientId && cred.clientSecret);
+}
+
 function createPublicConfig() {
   const extractionCredentials = {};
   for (const id of EXTRACTION_IDS) {
@@ -452,6 +500,9 @@ function normalizeConfigAfterLoad() {
   CONFIG.CLEANUP_RATE_LIMIT_PER_MINUTE = Math.max(1, Math.min(300, Number(String(CONFIG.CLEANUP_RATE_LIMIT_PER_MINUTE).replace(',', '.')) || 280));
   CONFIG.CLEANUP_RATE_LIMIT_FALLBACK_SECONDS = Math.max(1, Number(String(CONFIG.CLEANUP_RATE_LIMIT_FALLBACK_SECONDS).replace(',', '.')) || 30);
   CONFIG.CLEANUP_START_INTERVAL_MS = Math.max(0, Number(String(CONFIG.CLEANUP_START_INTERVAL_MS).replace(',', '.')) || 0);
+  CONFIG.CLEANUP_USE_UPLOAD_CREDENTIALS = CONFIG.CLEANUP_USE_UPLOAD_CREDENTIALS === true
+    || ['1', 'true', 'sim', 'yes'].includes(String(CONFIG.CLEANUP_USE_UPLOAD_CREDENTIALS || '').toLowerCase());
+  CONFIG.CLEANUP_MAX_CREDENTIALS = Math.max(1, Math.min(20, Number(String(CONFIG.CLEANUP_MAX_CREDENTIALS).replace(',', '.')) || 6));
 }
 
 function buildMesaActivityQuery(queueIds = getQueueIds()) {
@@ -853,13 +904,33 @@ async function consultarMesaGenesys({ includeDetails = true, protocolOnly = fals
   if (onProgress) onProgress(`${conversations.length} conversa(s) na mesa. Lendo dados analiticos em lote...`);
   const baseRecords = await getMesaAnalyticsRecordsBulk(analyticsApi, conversations, onProgress);
 
-  if (onProgress) onProgress('Enriquecendo dados da mesa com uma leitura em tempo real, sem retry longo...');
-  let records = await mapLimit(baseRecords, 12, async (base, index) => {
+  const detailCredentialServices = createCleanupCredentialServices({
+    onRateLimit: (seconds, credentialName) => onProgress
+      && onProgress(`Rate limit nos detalhes (${credentialName}). Aguardando ${seconds}s...`),
+  });
+  const detailServices = detailCredentialServices?.length
+    ? detailCredentialServices.map(service => ({ name: service.credential.name, api: service, limiter: service.limiter }))
+    : [{ name: 'GENESYS', api: conversationsApi, limiter: null }];
+  const detailConcurrency = detailCredentialServices?.length
+    ? Math.min(50, Math.max(12, 12 * detailCredentialServices.length))
+    : 12;
+  let detailServiceIndex = 0;
+
+  if (onProgress) {
+    onProgress(detailCredentialServices?.length
+      ? `Enriquecendo dados da mesa com ${detailCredentialServices.length} credencial(is), paralelo ${detailConcurrency}...`
+      : 'Enriquecendo dados da mesa com uma leitura em tempo real, sem retry longo...');
+  }
+  let records = await mapLimit(baseRecords, detailConcurrency, async (base, index) => {
     if (onProgress && (index === 0 || (index + 1) % 100 === 0)) {
       onProgress(`Enriquecendo detalhes: ${index + 1}/${baseRecords.length}`);
     }
     try {
-      const conv = await conversationsApi.getConversation(base.conversationId);
+      const service = detailServices[detailServiceIndex % detailServices.length];
+      detailServiceIndex += 1;
+      const conv = service.limiter
+        ? await getConversationDetailControlled(service, base.conversationId)
+        : await conversationsApi.getConversation(base.conversationId);
       const detail = mapMesaRecord(conv, base.conversationId, base.queueId);
       return mergeMesaRecords(base, detail);
     } catch (e) {
@@ -1103,6 +1174,90 @@ function parseRetryAfterSeconds(error, fallbackSeconds) {
   return fallbackSeconds;
 }
 
+const GENESYS_REST_REGIONS = {
+  sa_east_1: { tokenUrl: 'https://login.sae1.pure.cloud/oauth/token', apiUrl: 'https://api.sae1.pure.cloud' },
+  sae1: { tokenUrl: 'https://login.sae1.pure.cloud/oauth/token', apiUrl: 'https://api.sae1.pure.cloud' },
+  SAE: { tokenUrl: 'https://login.sae1.pure.cloud/oauth/token', apiUrl: 'https://api.sae1.pure.cloud' },
+  us_east_1: { tokenUrl: 'https://login.mypurecloud.com/oauth/token', apiUrl: 'https://api.mypurecloud.com' },
+  US_EAST: { tokenUrl: 'https://login.mypurecloud.com/oauth/token', apiUrl: 'https://api.mypurecloud.com' },
+  us_west_2: { tokenUrl: 'https://login.usw2.pure.cloud/oauth/token', apiUrl: 'https://api.usw2.pure.cloud' },
+  USW2: { tokenUrl: 'https://login.usw2.pure.cloud/oauth/token', apiUrl: 'https://api.usw2.pure.cloud' },
+};
+
+function getGenesysRestRegion() {
+  const region = String(CONFIG.ORG_REGION || process.env.ORG_REGION || 'sa_east_1').trim();
+  return {
+    region,
+    ...(GENESYS_REST_REGIONS[region] || GENESYS_REST_REGIONS[region.replace(/-/g, '_')] || GENESYS_REST_REGIONS.sa_east_1),
+  };
+}
+
+async function responseToGenesysError(response, label) {
+  const text = await response.text().catch(() => '');
+  const error = new Error(`${label || 'Genesys'} (${response.status}): ${text.slice(0, 300) || response.statusText}`);
+  error.status = response.status;
+  error.headers = response.headers;
+  return error;
+}
+
+class GenesysRestService {
+  constructor(regionConfig, credential, limiter = null) {
+    this.regionConfig = regionConfig;
+    this.credential = credential;
+    this.limiter = limiter;
+    this.token = '';
+    this.expiresAt = 0;
+  }
+
+  async getToken(force = false) {
+    if (!force && this.token && Date.now() < this.expiresAt - 60000) return this.token;
+    const basic = Buffer.from(`${this.credential.clientId}:${this.credential.clientSecret}`, 'latin1').toString('base64');
+    const response = await fetch(this.regionConfig.tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${basic}`,
+      },
+      body: 'grant_type=client_credentials',
+    });
+    if (!response.ok) throw await responseToGenesysError(response, `Token ${this.credential.name}`);
+    const payload = await response.json();
+    this.token = payload.access_token || '';
+    this.expiresAt = Date.now() + (Number(payload.expires_in || 3600) * 1000);
+    if (!this.token) throw new Error(`Token vazio para ${this.credential.name}.`);
+    return this.token;
+  }
+
+  async request(method, route, body = null) {
+    const execute = async forceToken => {
+      const token = await this.getToken(forceToken);
+      return fetch(`${this.regionConfig.apiUrl}${route}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    };
+
+    let response = await execute(false);
+    if (response.status === 401) response = await execute(true);
+    if (!response.ok) throw await responseToGenesysError(response, this.credential.name);
+    if (response.status === 204) return null;
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  }
+
+  disconnectConversation(conversationId) {
+    return this.request('POST', `/api/v2/conversations/${encodeURIComponent(conversationId)}/disconnect`);
+  }
+
+  getConversation(conversationId) {
+    return this.request('GET', `/api/v2/conversations/${encodeURIComponent(conversationId)}`);
+  }
+}
+
 function createCleanupRateLimiter({ requestsPerMinute, fallbackSeconds, onRateLimit }) {
   const rpm = Math.max(1, Math.min(300, Number(requestsPerMinute) || 280));
   const intervalMs = Math.ceil(60000 / rpm);
@@ -1147,7 +1302,7 @@ function createCleanupRateLimiter({ requestsPerMinute, fallbackSeconds, onRateLi
   return { waitTurn, pauseFrom429, intervalMs, rpm };
 }
 
-async function disconnectConversationSafe(conversationsApi, conversationId, options = {}) {
+async function disconnectConversationSafe(disconnectApi, conversationId, options = {}) {
   const retries = Math.max(1, Number(options.retries) || 3);
   const limiter = options.limiter;
   let attempt = 0;
@@ -1155,7 +1310,11 @@ async function disconnectConversationSafe(conversationsApi, conversationId, opti
   while (true) {
     try {
       if (limiter) await limiter.waitTurn();
-      await conversationsApi.postConversationDisconnect(conversationId);
+      if (typeof disconnectApi.disconnectConversation === 'function') {
+        await disconnectApi.disconnectConversation(conversationId);
+      } else {
+        await disconnectApi.postConversationDisconnect(conversationId);
+      }
       return { ok: true, conversationId };
     } catch (error) {
       const status = error.response?.status || error.status;
@@ -1177,12 +1336,55 @@ async function disconnectConversationSafe(conversationsApi, conversationId, opti
   }
 }
 
+function createCleanupCredentialServices({ onRateLimit } = {}) {
+  if (!CONFIG.CLEANUP_USE_UPLOAD_CREDENTIALS) return null;
+  const maxCredentials = Math.max(1, Math.min(20, Number(CONFIG.CLEANUP_MAX_CREDENTIALS) || 6));
+  const credentials = parseMesaUploadCredentials(CONFIG.MESA_UPLOAD_CREDENTIALS, true).slice(0, maxCredentials);
+  if (!credentials.length) return null;
+
+  const regionConfig = getGenesysRestRegion();
+  const rateLimitPerMinute = Math.max(1, Math.min(300, Number(CONFIG.CLEANUP_RATE_LIMIT_PER_MINUTE) || 280));
+  const fallbackSeconds = Math.max(1, Number(CONFIG.CLEANUP_RATE_LIMIT_FALLBACK_SECONDS) || 30);
+
+  return credentials.map(credential => {
+    const limiter = createCleanupRateLimiter({
+      requestsPerMinute: rateLimitPerMinute,
+      fallbackSeconds,
+      onRateLimit: seconds => onRateLimit && onRateLimit(seconds, credential.name),
+    });
+    return new GenesysRestService(regionConfig, credential, limiter);
+  });
+}
+
+async function getConversationDetailControlled(service, conversationId) {
+  let attempt = 0;
+  while (true) {
+    try {
+      if (service.limiter) await service.limiter.waitTurn();
+      return await service.api.getConversation(conversationId);
+    } catch (error) {
+      const status = error.response?.status || error.status;
+      if (status === 429 && service.limiter) {
+        await service.limiter.pauseFrom429(error);
+        continue;
+      }
+      attempt += 1;
+      if ([408, 500, 502, 503, 504].includes(Number(status)) && attempt < 3) {
+        await delay(Math.min(5000, 1000 * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 async function disconnectConversationsControlled(conversationsApi, conversationIds) {
   const concurrency = Math.max(1, Math.min(50, Number(CONFIG.CLEANUP_CONCURRENCY) || 10));
   const rateLimitPerMinute = Math.max(1, Math.min(300, Number(CONFIG.CLEANUP_RATE_LIMIT_PER_MINUTE) || 280));
   const fallbackSeconds = Math.max(1, Number(CONFIG.CLEANUP_RATE_LIMIT_FALLBACK_SECONDS) || 30);
   const total = conversationIds.length;
   const state = { total, processed: 0, success: 0, error: 0 };
+  let credentialServices = null;
 
   function emitProgress(extra = {}) {
     emitCleanupProgress({
@@ -1190,6 +1392,9 @@ async function disconnectConversationsControlled(conversationsApi, conversationI
       pending: Math.max(0, total - state.processed),
       concurrency,
       rateLimitPerMinute,
+      credentialPoolSize: credentialServices?.length || 1,
+      effectiveRateLimitPerMinute: rateLimitPerMinute * (credentialServices?.length || 1),
+      credentialPoolEnabled: !!credentialServices,
       ...extra,
     });
   }
@@ -1204,22 +1409,46 @@ async function disconnectConversationsControlled(conversationsApi, conversationI
       msg: `Rate limit atingido. Aguardando ${seconds} segundos para continuar...`,
     }),
   });
+  credentialServices = createCleanupCredentialServices({
+    onRateLimit: (seconds, credentialName) => emitProgress({
+      status: 'rate_limited',
+      rateLimited: true,
+      retryAfterSeconds: seconds,
+      credentialName,
+      msg: `Rate limit atingido em ${credentialName}. Aguardando ${seconds} segundos para continuar...`,
+    }),
+  });
+  const fallbackService = { name: 'GENESYS', api: conversationsApi, limiter };
+  const services = credentialServices?.length
+    ? credentialServices.map(service => ({ name: service.credential.name, api: service, limiter: service.limiter }))
+    : [fallbackService];
+  let nextServiceIndex = 0;
+
+  function nextService() {
+    const service = services[nextServiceIndex % services.length];
+    nextServiceIndex += 1;
+    return service;
+  }
 
   emitProgress({
     status: 'running',
     rateLimited: false,
-    msg: `Iniciando limpeza com paralelo ${concurrency} e limite ${limiter.rpm} req/min.`,
+    msg: credentialServices?.length
+      ? `Iniciando limpeza com ${credentialServices.length} credencial(is), paralelo ${concurrency} e limite efetivo ${rateLimitPerMinute * credentialServices.length} req/min.`
+      : `Iniciando limpeza com paralelo ${concurrency} e limite ${limiter.rpm} req/min.`,
   });
 
   const results = await mapLimit(conversationIds, concurrency, async conversationId => {
-    const result = await disconnectConversationSafe(conversationsApi, conversationId, {
-      limiter,
+    const service = nextService();
+    const result = await disconnectConversationSafe(service.api, conversationId, {
+      limiter: service.limiter,
       retries: 3,
       onRateLimitResume: () => emitProgress({
         status: 'running',
         rateLimited: false,
         retryAfterSeconds: 0,
-        msg: 'Rate limit liberado. Continuando limpeza...',
+        credentialName: service.name,
+        msg: `Rate limit liberado em ${service.name}. Continuando limpeza...`,
       }),
     });
     state.processed += 1;

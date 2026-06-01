@@ -1720,7 +1720,7 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
           <div class="auto-row">
             <div class="auto-info">
               <div class="auto-title">Velocidade da limpeza</div>
-              <div class="auto-sub">Paralelo controla conversas em processamento; req/min controla o limite global da Genesys</div>
+              <div class="auto-sub">Paralelo controla conversas em processamento; req/min controla o limite por credencial ativa</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
               <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">paralelo</span>
@@ -1729,6 +1729,20 @@ body[data-theme="light"] .mesa-table tr:hover td { background: #eef4ff; }
               <input class="num-input" type="number" id="cfg-cleanup-rate" min="1" max="300" value="280"/>
               <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">429/s</span>
               <input class="num-input" type="number" id="cfg-cleanup-fallback" min="1" max="300" value="30"/>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-info">
+              <div class="auto-title">Pool de credenciais na limpeza</div>
+              <div class="auto-sub">Usa as credenciais da Subida JS para distribuir leitura/limpeza com rate limit separado por credencial</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+              <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text2);font-family:var(--mono)">
+                <input type="checkbox" id="cfg-cleanup-use-upload-creds"/>
+                usar pool
+              </label>
+              <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">max creds</span>
+              <input class="num-input" type="number" id="cfg-cleanup-max-creds" min="1" max="20" value="6"/>
             </div>
           </div>
           <div class="auto-row">
@@ -1974,12 +1988,18 @@ function updateCleanupProgress(data = {}) {
   set('cleanProgSuccess', fmtN(data.success || 0));
   set('cleanProgError', fmtN(data.error || 0));
   set('cleanProgPending', fmtN(data.pending || 0));
-  set('cleanProgRate', data.rateLimitPerMinute ? `${data.rateLimitPerMinute}/min` : '-');
+  if (data.effectiveRateLimitPerMinute && data.credentialPoolSize > 1) {
+    set('cleanProgRate', `${data.effectiveRateLimitPerMinute}/min (${data.credentialPoolSize} creds)`);
+  } else {
+    set('cleanProgRate', data.rateLimitPerMinute ? `${data.rateLimitPerMinute}/min` : '-');
+  }
 
   const status = document.getElementById('cleanupProgressStatus');
   if (status) status.classList.toggle('waiting', !!data.rateLimited);
   set('cleanProgStatus', data.msg || 'Limpeza em andamento...');
-  set('cleanProgCountdown', data.rateLimited ? `retoma em ${fmtN(data.retryAfterSeconds || 0)}s` : (data.concurrency ? `paralelo ${data.concurrency}` : ''));
+  set('cleanProgCountdown', data.rateLimited
+    ? `retoma em ${fmtN(data.retryAfterSeconds || 0)}s`
+    : (data.concurrency ? `paralelo ${data.concurrency}${data.credentialPoolSize > 1 ? ' · pool ' + data.credentialPoolSize : ''}` : ''));
 }
 
 function resumoEstadosLimpeza(records) {
@@ -2705,6 +2725,8 @@ function applyConfigToUI(cfg) {
   document.getElementById('cfg-cleanup-concurrency').value = cfg.CLEANUP_CONCURRENCY || 10;
   document.getElementById('cfg-cleanup-rate').value = cfg.CLEANUP_RATE_LIMIT_PER_MINUTE || 280;
   document.getElementById('cfg-cleanup-fallback').value = cfg.CLEANUP_RATE_LIMIT_FALLBACK_SECONDS || 30;
+  document.getElementById('cfg-cleanup-use-upload-creds').checked = !!cfg.CLEANUP_USE_UPLOAD_CREDENTIALS;
+  document.getElementById('cfg-cleanup-max-creds').value = cfg.CLEANUP_MAX_CREDENTIALS || 6;
   document.getElementById('cfg-upload-strategy').value = cfg.MESA_UPLOAD_STRATEGY || 'paced';
   document.getElementById('cfg-upload-workers').value = cfg.MESA_UPLOAD_WORKERS || 5;
   document.getElementById('cfg-upload-interval').value = cfg.MESA_UPLOAD_INTERVAL_SECONDS ?? 2;
@@ -2780,6 +2802,8 @@ async function saveConfig() {
     CLEANUP_CONCURRENCY: readNumberInput('cfg-cleanup-concurrency', 10),
     CLEANUP_RATE_LIMIT_PER_MINUTE: readNumberInput('cfg-cleanup-rate', 280),
     CLEANUP_RATE_LIMIT_FALLBACK_SECONDS: readNumberInput('cfg-cleanup-fallback', 30),
+    CLEANUP_USE_UPLOAD_CREDENTIALS: !!document.getElementById('cfg-cleanup-use-upload-creds')?.checked,
+    CLEANUP_MAX_CREDENTIALS: readNumberInput('cfg-cleanup-max-creds', 6),
     MESA_UPLOAD_STRATEGY: document.getElementById('cfg-upload-strategy').value || 'paced',
     MESA_UPLOAD_WORKERS: readNumberInput('cfg-upload-workers', 5),
     MESA_UPLOAD_INTERVAL_SECONDS: readNumberInput('cfg-upload-interval', 2),

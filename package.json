@@ -1,7 +1,7 @@
 {
   "name": "mesa-distribuicao-bko",
   "productName": "ADM Mesa de Distribuição",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "ADM Mesa de Distribuicao - Painel desktop Backoffice",
   "main": "main.js",
   "author": "BackOffice",

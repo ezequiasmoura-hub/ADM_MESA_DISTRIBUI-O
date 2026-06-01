@@ -187,6 +187,16 @@ Protecoes:
 - nao repete sucesso ja processado durante a fila;
 - registra erros por conversa.
 
+Quando `CLEANUP_USE_UPLOAD_CREDENTIALS` esta ativo, a limpeza cria um pool com as credenciais de `MESA_UPLOAD_CREDENTIALS`. Nesse modo:
+
+- as chamadas de disconnect usam REST direto (`GenesysRestService`), sem depender do singleton do SDK;
+- cada credencial tem seu proprio `createCleanupRateLimiter()`;
+- o limite `CLEANUP_RATE_LIMIT_PER_MINUTE` e aplicado por credencial;
+- `429` pausa somente a credencial afetada;
+- a tela recebe `credentialPoolSize` e `effectiveRateLimitPerMinute`.
+
+A consulta detalhada da mesa tambem pode usar o mesmo pool para chamadas `GET /api/v2/conversations/{id}`, acelerando o enriquecimento de dados quando ha varias credenciais autorizadas.
+
 ## Rate limiter global
 
 `createCleanupRateLimiter()` controla o inicio das chamadas de limpeza.

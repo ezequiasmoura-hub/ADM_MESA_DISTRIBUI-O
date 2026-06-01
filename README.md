@@ -148,8 +148,8 @@ Saidas principais:
 
 ```text
 dist/win-unpacked/ADM Mesa de Distribuição.exe
-dist/ADM-Mesa-de-Distribuicao-2.4.0-Setup-x64.exe
-dist/ADM-Mesa-de-Distribuicao-2.4.0-Portable-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.5.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.5.0-Portable-x64.exe
 ```
 
 Detalhes completos em [docs/BUILD_E_EXECUTAVEL.md](docs/BUILD_E_EXECUTAVEL.md).
@@ -188,10 +188,11 @@ O processo registra total encontrado, processadas, sucesso, erro, pendentes, sta
 ## Rate limit, paralelismo e retry
 
 - `CLEANUP_CONCURRENCY`: conversas em processamento ao mesmo tempo.
-- `CLEANUP_RATE_LIMIT_PER_MINUTE`: chamadas de limpeza iniciadas por minuto.
+- `CLEANUP_RATE_LIMIT_PER_MINUTE`: chamadas de limpeza iniciadas por minuto; com pool ativo, vale por credencial.
 - `CLEANUP_RATE_LIMIT_FALLBACK_SECONDS`: espera padrao quando `Retry-After` nao vier.
+- `CLEANUP_USE_UPLOAD_CREDENTIALS`: usa as credenciais da Subida JS para acelerar consulta/limpeza com rate limit separado por credencial.
 
-Mesmo com paralelismo alto, o rate limiter global controla o ritmo total. Em `429`, a aplicacao pausa, mostra contagem regressiva, respeita `Retry-After` e continua a fila sem repetir conversas ja processadas.
+Mesmo com paralelismo alto, o rate limiter controla o ritmo total; com pool ativo, o controle passa a ser por credencial. Em `429`, a aplicacao pausa a credencial afetada, mostra contagem regressiva, respeita `Retry-After` e continua a fila sem repetir conversas ja processadas.
 
 ## Seguranca
 

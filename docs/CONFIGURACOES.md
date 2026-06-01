@@ -115,13 +115,15 @@ Na UI aparece como **paralelo**.
 
 ### `CLEANUP_RATE_LIMIT_PER_MINUTE`
 
-Limite global de requisicoes de limpeza iniciadas por minuto.
+Limite de requisicoes de limpeza iniciadas por minuto.
 
 ```env
 CLEANUP_RATE_LIMIT_PER_MINUTE=280
 ```
 
 Padrao: `280`. A normalizacao limita a no maximo `300`.
+
+Quando `CLEANUP_USE_UPLOAD_CREDENTIALS=1`, esse limite passa a ser aplicado por credencial ativa. Com 6 credenciais e valor `280`, o limite efetivo pode chegar a `1680 req/min`, mantendo controle de 429 por credencial.
 
 ### `CLEANUP_RATE_LIMIT_FALLBACK_SECONDS`
 
@@ -130,6 +132,26 @@ Tempo de espera quando a Genesys retorna `429` sem `Retry-After`.
 ```env
 CLEANUP_RATE_LIMIT_FALLBACK_SECONDS=30
 ```
+
+### `CLEANUP_USE_UPLOAD_CREDENTIALS`
+
+Usa as credenciais configuradas em `MESA_UPLOAD_CREDENTIALS` tambem para consulta detalhada e limpeza da mesa.
+
+```env
+CLEANUP_USE_UPLOAD_CREDENTIALS=1
+```
+
+Quando ativado, cada credencial recebe seu proprio rate limiter. Se alguma credencial receber `429`, apenas ela pausa e o processo continua com as demais quando possivel.
+
+### `CLEANUP_MAX_CREDENTIALS`
+
+Quantidade maxima de credenciais da subida usadas pela limpeza.
+
+```env
+CLEANUP_MAX_CREDENTIALS=6
+```
+
+Use para limitar o pool mesmo quando existirem mais credenciais cadastradas.
 
 ### `CLEANUP_QUEUE_IDS`
 
@@ -364,6 +386,8 @@ QUEUE_IDS=queue-id-exemplo-1,queue-id-exemplo-2
 CLEANUP_CONCURRENCY=10
 CLEANUP_RATE_LIMIT_PER_MINUTE=280
 CLEANUP_RATE_LIMIT_FALLBACK_SECONDS=30
+CLEANUP_USE_UPLOAD_CREDENTIALS=0
+CLEANUP_MAX_CREDENTIALS=6
 INPUT_MESA_DIR=
 LOG_DIR=
 EXTRACAO_USUARIO=usuario_exemplo

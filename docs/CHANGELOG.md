@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.5.0 - 2026-06-01
+
+### Melhorias
+
+- Limpeza da mesa pode usar pool com as credenciais configuradas em `MESA_UPLOAD_CREDENTIALS`.
+- Cada credencial do pool possui rate limiter proprio, respeitando `Retry-After` em caso de `429`.
+- Consulta detalhada da mesa pode usar o mesmo pool para acelerar leitura de conversas.
+- Tela de configuracoes recebeu opcao **usar pool** e limite de credenciais para limpeza.
+- Indicadores da limpeza mostram limite efetivo e quantidade de credenciais ativas.
+
+### Seguranca
+
+- O pool e opcional e nao expõe client secret no renderer.
+- Tokens continuam fora de logs e nao sao persistidos.
+
 ## 2.4.0 - 2026-05-29
 
 ### Alteracoes
