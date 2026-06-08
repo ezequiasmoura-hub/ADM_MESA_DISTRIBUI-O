@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.7.0 - 2026-06-08
+
+### Melhorias
+
+- Limpeza passa a usar todas as credenciais configuradas para subida da mesa, distribuindo chamadas entre elas para acelerar a operacao.
+- Limpeza por ID da mesa reaproveita a pre-consulta ja realizada, evitando consultar as mesmas filas duas vezes.
+- Limpeza de itens selecionados evita validacao extra por padrao e executa apenas os `conversationIds` enviados pela interface.
+- Modo automatico chama **Limpar tratados fora** depois que a subida da mesa termina com sucesso.
+
 ## 2.6.0 - 2026-06-01
 
 ### Correcoes

@@ -2206,9 +2206,11 @@ function selectedLimpezaRecords() {
   return S.limpeza.records.filter(r => ids.has(r.conversationId));
 }
 
-async function limparTratadosFora() {
+async function limparTratadosFora(options = {}) {
+  const auto = options.auto === true;
   setProcessStatus('run', 'Comparando mesa com bases atuais...');
   logLimpeza('Iniciando comparacao: protocolos na mesa que nao existem ou nao entram nas bases atuais.');
+  if (auto) appendAutoHistory('Comparando tratados fora apos subida da mesa');
 
   try {
     const preview = await api.previewTratadosFora();
@@ -2239,7 +2241,9 @@ async function limparTratadosFora() {
       success: 0,
       error: 0,
       pending: candidatos.length,
-      msg: candidatos.length ? 'Tratados fora selecionados. Aguardando confirmacao.' : 'Nenhum tratado fora encontrado.',
+      msg: candidatos.length
+        ? (auto ? 'Tratados fora selecionados para limpeza automatica.' : 'Tratados fora selecionados. Aguardando confirmacao.')
+        : 'Nenhum tratado fora encontrado.',
     });
     logLimpeza(aviso);
 
@@ -2249,18 +2253,22 @@ async function limparTratadosFora() {
       return;
     }
 
-    const okConfirm = confirm(
-      `Limpar tratados fora\n\n` +
-      `Foram encontrados ${fmtN(candidatos.length)} protocolo(s) na mesa que nao existem ou nao entram nas bases atuais.\n\n` +
-      `Estados: ${resumo || '-'}\n\n` +
-      `Sem protocolo identificado foram ignorados: ${fmtN(preview.semProtocolo || 0)}.\n\n` +
-      `A limpeza sera real e somente nesses itens selecionados.\n\n` +
-      `Confirma a limpeza?`
-    );
-    if (!okConfirm) {
-      setProcessStatus('ok', 'Limpeza de tratados fora cancelada');
-      toast('Limpeza cancelada.', 'inf');
-      return;
+    if (!auto) {
+      const okConfirm = confirm(
+        `Limpar tratados fora\n\n` +
+        `Foram encontrados ${fmtN(candidatos.length)} protocolo(s) na mesa que nao existem ou nao entram nas bases atuais.\n\n` +
+        `Estados: ${resumo || '-'}\n\n` +
+        `Sem protocolo identificado foram ignorados: ${fmtN(preview.semProtocolo || 0)}.\n\n` +
+        `A limpeza sera real e somente nesses itens selecionados.\n\n` +
+        `Confirma a limpeza?`
+      );
+      if (!okConfirm) {
+        setProcessStatus('ok', 'Limpeza de tratados fora cancelada');
+        toast('Limpeza cancelada.', 'inf');
+        return;
+      }
+    } else {
+      appendAutoHistory(`Limpando ${fmtN(candidatos.length)} tratado(s) fora automaticamente`);
     }
 
     setProcessStatus('run', 'Limpando tratados fora...');
@@ -2285,9 +2293,10 @@ async function limparTratadosFora() {
     const resultResumo = `${fmtN(res.removed || 0)} tratados fora removidos, ${fmtN(res.failures?.length || 0)} falhas, ${fmtN(res.ignored || 0)} ignorados.`;
     document.getElementById('limpaPreviewResumo').textContent = resultResumo;
     logLimpeza(`Limpeza tratados fora concluida: ${resultResumo} Log: ${res.logPath || '-'}`);
+    if (auto) appendAutoHistory(`Tratados fora: ${resultResumo}`);
     setProcessStatus('ok', 'Tratados fora limpos');
-    toast('Tratados fora limpos. Atualizando mesa...', 'ok');
-    await consultarMesaLimpeza();
+    toast(auto ? 'Tratados fora limpos apos subida da mesa.' : 'Tratados fora limpos. Atualizando mesa...', 'ok');
+    if (!auto) await consultarMesaLimpeza();
     document.getElementById('limpaPreviewResumo').textContent = resultResumo;
   } catch (e) {
     setProcessStatus('err', 'Erro ao limpar tratados fora');
@@ -2321,7 +2330,14 @@ async function confirmarLimpezaReal() {
       setProcessStatus('ok', 'Nenhuma conversa encontrada para limpar');
       return;
     }
-    payloadBase = { dryRun: false, confirmText: 'LIMPAR', cleanupMode: 'queueIds', filtros };
+    payloadBase = {
+      dryRun: false,
+      confirmText: 'LIMPAR',
+      cleanupMode: 'queueIds',
+      filtros,
+      conversationIds: preview.conversationIds || [],
+      records: preview.records || [],
+    };
     confirmText =
       `Modo por ID da mesa ativo (${cleanupQueueModeLabel(filtros)}).\n\n` +
       `Conversas encontradas agora: ${fmtN(preview.selecionados)}\n` +
@@ -2599,6 +2615,10 @@ async function executarFluxo(isAutoRun = false) {
         appendLog(5, 'Subida JS integrada executada com sucesso.');
         appendAutoHistory(`Mesa atualizada com ${fmtN(res.total)} registros`);
         toast('Base gerada e subida na mesa com sucesso!', 'ok');
+        if (isAutoRun || S.mode === 'auto') {
+          setProcessStatus('run', 'Subida concluida. Limpando tratados fora...');
+          await limparTratadosFora({ auto: true });
+        }
       } else {
         setProcessStatus('warn', 'Erro ao executar Mesa');
         appendLog(5, 'Aviso: ' + mesaRes.msg);

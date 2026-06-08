@@ -148,8 +148,8 @@ Saidas principais:
 
 ```text
 dist/win-unpacked/ADM Mesa de Distribuição.exe
-dist/ADM-Mesa-de-Distribuicao-2.6.0-Setup-x64.exe
-dist/ADM-Mesa-de-Distribuicao-2.6.0-Portable-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.7.0-Setup-x64.exe
+dist/ADM-Mesa-de-Distribuicao-2.7.0-Portable-x64.exe
 ```
 
 Detalhes completos em [docs/BUILD_E_EXECUTAVEL.md](docs/BUILD_E_EXECUTAVEL.md).

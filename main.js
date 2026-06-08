@@ -1375,9 +1375,7 @@ async function disconnectConversationSafe(disconnectApi, conversationId, options
 }
 
 function createCleanupCredentialServices({ onRateLimit } = {}) {
-  if (!CONFIG.CLEANUP_USE_UPLOAD_CREDENTIALS) return null;
-  const maxCredentials = Math.max(1, Math.min(20, Number(CONFIG.CLEANUP_MAX_CREDENTIALS) || 6));
-  const credentials = parseMesaUploadCredentials(CONFIG.MESA_UPLOAD_CREDENTIALS, true).slice(0, maxCredentials);
+  const credentials = parseMesaUploadCredentials(CONFIG.MESA_UPLOAD_CREDENTIALS, true);
   if (!credentials.length) return null;
 
   const regionConfig = getGenesysRestRegion();
@@ -2034,9 +2032,11 @@ ipcMain.handle('limpar-mesa', async (_, payload = {}) => {
         : 'Nenhum ID de fila configurado para limpeza por ID da mesa.';
       return { ok: false, msg };
     }
-    const mesaPorFila = await consultarMesaPorQueueIds(queueIds);
-    records = mesaPorFila.records || [];
-    ids = records.map(r => r.conversationId);
+    if (!ids.length || !records.length) {
+      const mesaPorFila = await consultarMesaPorQueueIds(queueIds);
+      records = mesaPorFila.records || [];
+      ids = records.map(r => r.conversationId);
+    }
     queueModeInfo = {
       queueIds,
       estados: [...new Set(queueIds.map(id => getQueueMeta(id).empresa || '').filter(Boolean))],
@@ -2073,7 +2073,9 @@ ipcMain.handle('limpar-mesa', async (_, payload = {}) => {
       ok: true,
       dryRun: true,
       selecionados: ids.length,
+      conversationIds: ids,
       protocolos,
+      records,
       queueModeInfo,
       logPath,
       msg: cleanupMode === 'queueIds'
@@ -2097,13 +2099,13 @@ ipcMain.handle('limpar-mesa', async (_, payload = {}) => {
       status: 'validating',
       rateLimited: false,
       retryAfterSeconds: 0,
-      msg: cleanupMode === 'queueIds' ? 'Preparando limpeza por ID da mesa...' : 'Validando conversas selecionadas...',
+      msg: cleanupMode === 'queueIds' ? 'Preparando limpeza por ID da mesa...' : 'Preparando limpeza dos itens selecionados...',
     });
 
     let idsValidados = ids;
     let ignorados = [];
 
-    if (cleanupMode !== 'queueIds') {
+    if (cleanupMode !== 'queueIds' && payload.validateBeforeClean === true) {
       const mesaAtual = await consultarMesaGenesys({ includeDetails: false });
       const idsAindaNaMesa = new Set(mesaAtual.records.map(r => r.conversationId));
       idsValidados = ids.filter(id => idsAindaNaMesa.has(id));
