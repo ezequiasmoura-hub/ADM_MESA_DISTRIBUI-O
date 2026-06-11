@@ -1,5 +1,11 @@
 # Changelog
 
+## Extrator Agendado 1.0.1 - 2026-06-11
+
+### Correcao
+
+- O Site Novo passa a salvar os arquivos exatamente na pasta escolhida no aplicativo Extrator Agendado, sem usar o caminho fixo padrao.
+
 ## 2.8.1 - 2026-06-11
 
 ### Correcao

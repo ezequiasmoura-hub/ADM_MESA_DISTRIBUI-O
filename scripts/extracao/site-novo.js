@@ -3,7 +3,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 const { BASE_DIR, ensureDir, launchChromium, requireCredentials } = require('./shared');
 
-const DOWNLOAD_DIR = path.join(BASE_DIR, 'SITE NOVO');
+const DOWNLOAD_DIR = process.env.EXTRACAO_OUTPUT_DIR || path.join(BASE_DIR, 'SITE NOVO');
 const EXPORT_ENDPOINT = '/Backoffice/screenservices/Backoffice/MainFlow/BuscaSolicitacoes/ActionExportarListaDeSolicitacoes';
 const DEFAULT_EXPORT_VERSION_INFO = {
   moduleVersion: 'XrFzPehIB7VIKKcE06g58g',
@@ -267,6 +267,7 @@ async function baixarEtapa(page, exportVersionInfo, periodo, etapa) {
 
 async function run() {
   ensureDir(DOWNLOAD_DIR);
+  console.log(`Pasta de saida: ${DOWNLOAD_DIR}`);
   const startedAt = Date.now();
   const useCdp = process.env.EXTRACAO_SITE_NOVO_CDP === '1';
   console.log(useCdp ? 'Conectando ao navegador Site Novo na porta 9222...' : 'Abrindo navegador proprio para o Site Novo...');

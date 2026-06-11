@@ -30,3 +30,7 @@ npm run extractor-app:dist
 Os artefatos sao gerados em `dist-extrator/`.
 
 O agendamento funciona enquanto o aplicativo estiver aberto ou minimizado na bandeja. A maquina precisa estar ligada e com acesso aos sites e pastas configurados.
+
+## Pasta de saida
+
+Cada extrator grava diretamente na pasta escolhida no respectivo card. O Site Novo gera `01_Todos_Aberto.xls` e `02_Todos_Pendente.xls` nessa pasta, sem acrescentar automaticamente outra subpasta `SITE NOVO`.

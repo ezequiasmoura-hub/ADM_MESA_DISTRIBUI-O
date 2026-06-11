@@ -1,7 +1,7 @@
 {
   "name": "extrator-agendado-de-bases",
   "productName": "Extrator Agendado de Bases",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Aplicativo desktop para extracao manual e agendada das bases operacionais",
   "main": "main.js",
   "private": true

@@ -6,7 +6,7 @@ asar: false
 extraMetadata:
   name: extrator-agendado-de-bases
   productName: Extrator Agendado de Bases
-  version: 1.0.0
+  version: 1.0.1
   main: extractor-app/main.js
 
 directories:
