@@ -152,6 +152,8 @@ O processo filho recebe `NODE_PATH` apontando para o `node_modules` empacotado, 
 
 A UI permite rodar os quatro extratores em concorrencia. Internamente, a execucao em lote usa `Promise.all()` sobre os IDs selecionados.
 
+Site Antigo, GO e RS passam por validacao em `scripts/extracao/output-validation.js`. O orquestrador exige arquivo atualizado na tentativa atual, cabecalho compativel e ao menos uma linha de dados. Se o processo falhar ou a validacao reprovar, apenas aquele extrator aguarda `EXTRACTION_RETRY_DELAY_SECONDS` e reinicia; o fluxo automatico permanece bloqueado ate todas as bases ficarem validas. O padrao `EXTRACTION_MAX_ATTEMPTS=0` mantem retentativa ilimitada.
+
 Logs de extracao ficam em:
 
 ```text

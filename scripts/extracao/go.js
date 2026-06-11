@@ -2,9 +2,10 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { request } = require('playwright');
 const { BASE_DIR, requireCredentials, writeCsv } = require('./shared');
+const { assertNonEmptyRows } = require('./output-validation');
 
 const URL_BASE = 'https://backoffice-go.equatorialenergia.com.br';
-const OUTPUT_FILE = path.join(BASE_DIR, 'EQTL_GO.csv');
+const OUTPUT_FILE = path.join(process.env.EXTRACAO_OUTPUT_DIR || BASE_DIR, 'EQTL_GO.csv');
 const CONCORRENCIA_HTTP = Number(process.env.EXTRACAO_GO_CONCORRENCIA) || 100;
 const HTTP_TIMEOUT_MS = Number(process.env.EXTRACAO_GO_TIMEOUT_MS) || 30000;
 const MAX_TENTATIVAS_HTTP = Number(process.env.EXTRACAO_GO_MAX_TENTATIVAS) || 3;
@@ -115,9 +116,8 @@ async function fetchPage(context, pageNum) {
         maxRedirects: 5,
       });
 
-      if (!response.ok()) {
-        return [];
-      }
+      if (response.status() === 404) return [];
+      if (!response.ok()) throw new Error(`pagina ${pageNum} retornou HTTP ${response.status()}`);
 
       const html = await response.text();
       if (html.includes('id="login"')) {
@@ -133,8 +133,7 @@ async function fetchPage(context, pageNum) {
     }
   }
 
-  console.warn(`[GO] Falha na pagina ${pageNum}: ${lastError?.message || 'erro desconhecido'}`);
-  return [];
+  throw new Error(`[GO] Falha na pagina ${pageNum}: ${lastError?.message || 'erro desconhecido'}`);
 }
 
 async function run() {
@@ -161,6 +160,7 @@ async function run() {
       }
     }
 
+    assertNonEmptyRows(allRows, 'Extracao GO');
     writeCsv(OUTPUT_FILE, allRows, ['data_abertura', 'protocolo', 'tipo_servico', 'conta_contrato', 'email', 'status']);
     console.log(`[GO] Total: ${allRows.length} capturados. Salvo em: ${OUTPUT_FILE}`);
   } finally {

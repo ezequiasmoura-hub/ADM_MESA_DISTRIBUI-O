@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Extrator Agendado de Bases</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090c11;
+      --surface: #10151d;
+      --surface-2: #151c27;
+      --line: #263142;
+      --line-soft: #1b2431;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --blue: #4f8cff;
+      --green: #2dd4a3;
+      --amber: #f7b84b;
+      --red: #fb5c76;
+      --shadow: 0 20px 50px rgba(0, 0, 0, .28);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 980px; min-height: 100vh; background: var(--bg); color: var(--text); }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    .icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .app-header { height: 72px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: #0c1017; }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 8px; background: var(--blue); box-shadow: 0 8px 24px rgba(79, 140, 255, .28); }
+    .brand-mark .icon { width: 21px; height: 21px; }
+    h1 { margin: 0; font-size: 18px; letter-spacing: 0; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .clock { margin-right: 12px; color: var(--muted); font: 12px Consolas, monospace; }
+    .btn { height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); cursor: pointer; transition: border-color .15s, background .15s, transform .15s; white-space: nowrap; }
+    .btn:hover { border-color: #42516a; background: #1a2331; }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--blue); border-color: var(--blue); color: white; font-weight: 650; }
+    .btn-primary:hover { background: #3f7cea; border-color: #3f7cea; }
+    .btn-danger { color: var(--red); }
+    .btn-small { height: 32px; padding: 0 10px; font-size: 12px; }
+    .icon-btn { width: 38px; padding: 0; }
+    main { padding: 24px 28px 32px; max-width: 1600px; margin: 0 auto; }
+    .summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .stat { min-height: 92px; padding: 17px 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+    .stat-label { color: var(--muted); text-transform: uppercase; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+    .stat-value { margin-top: 9px; font-size: 25px; font-weight: 730; letter-spacing: 0; }
+    .stat-note { margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .blue { color: var(--blue); } .green { color: var(--green); } .amber { color: var(--amber); } .red { color: var(--red); }
+    .workspace { display: grid; grid-template-columns: minmax(640px, 1.65fr) minmax(310px, .75fr); gap: 18px; align-items: start; }
+    .panel { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+    .panel-head { min-height: 59px; padding: 0 17px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+    .panel-title { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 700; }
+    .panel-subtitle { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .extractor-list { display: grid; }
+    .extractor { padding: 16px 17px; border-bottom: 1px solid var(--line-soft); }
+    .extractor:last-child { border-bottom: 0; }
+    .extractor-top { display: grid; grid-template-columns: 32px minmax(180px, 1fr) auto auto; gap: 12px; align-items: center; }
+    .source-icon { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; color: var(--blue); background: #111927; }
+    .source-name { font-size: 14px; font-weight: 700; }
+    .source-output { margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; min-width: 102px; justify-content: flex-end; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #64748b; }
+    .status.running .status-dot { background: var(--amber); box-shadow: 0 0 0 4px rgba(247,184,75,.12); }
+    .status.success .status-dot { background: var(--green); box-shadow: 0 0 0 4px rgba(45,212,163,.12); }
+    .status.error .status-dot { background: var(--red); box-shadow: 0 0 0 4px rgba(251,92,118,.12); }
+    .extractor-fields { margin-top: 14px; display: grid; grid-template-columns: minmax(150px, .7fr) minmax(150px, .7fr) minmax(260px, 1.6fr); gap: 10px; }
+    .field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .input-wrap { height: 38px; display: flex; align-items: center; border: 1px solid var(--line); border-radius: 7px; background: #0b1017; overflow: hidden; }
+    .input-wrap:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(79,140,255,.1); }
+    .input-wrap input { width: 100%; height: 100%; border: 0; outline: 0; padding: 0 11px; background: transparent; color: var(--text); min-width: 0; }
+    .input-wrap input::placeholder { color: #526176; }
+    .input-action { width: 38px; height: 36px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+    .input-action:hover { color: var(--text); background: var(--surface-2); }
+    .switch { position: relative; display: inline-block; width: 38px; height: 22px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; cursor: pointer; background: #263142; border-radius: 12px; transition: .2s; }
+    .slider::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; border-radius: 50%; background: white; transition: .2s; }
+    .switch input:checked + .slider { background: var(--blue); }
+    .switch input:checked + .slider::before { transform: translateX(16px); }
+    .side-stack { display: grid; gap: 18px; }
+    .schedule-body { padding: 17px; }
+    .schedule-state { padding: 13px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 7px; background: #0b1017; }
+    .schedule-state strong { font-size: 13px; }
+    .schedule-state span { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .section-label { margin: 18px 0 8px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
+    .time-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    input[type="time"] { color-scheme: dark; }
+    .time-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; min-height: 30px; }
+    .time-chip { height: 30px; display: inline-flex; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid #34517c; border-radius: 6px; background: #101b2b; color: #bcd3ff; font: 12px Consolas, monospace; }
+    .time-chip button { width: 17px; height: 17px; border: 0; padding: 0; color: #7792b9; background: transparent; cursor: pointer; font-size: 16px; line-height: 1; }
+    .time-chip button:hover { color: var(--red); }
+    .option-row { min-height: 43px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line-soft); }
+    .option-row:last-child { border-bottom: 0; }
+    .option-row span { font-size: 12px; }
+    .option-row small { display: block; margin-top: 3px; color: var(--muted); }
+    .activity { grid-column: 1 / -1; min-height: 220px; }
+    .log-toolbar { display: flex; gap: 8px; }
+    .log { height: 238px; overflow: auto; padding: 12px 16px; background: #080b10; font: 11px/1.65 Consolas, monospace; color: #a7b4c6; }
+    .log-line { display: grid; grid-template-columns: 72px 92px 1fr; gap: 10px; border-bottom: 1px solid rgba(255,255,255,.025); padding: 2px 0; }
+    .log-time { color: #526176; } .log-source { color: #78a6ff; } .log-error { color: var(--red); } .log-success { color: var(--green); }
+    .empty { padding: 28px; color: var(--muted); text-align: center; font-size: 12px; }
+    .toast { position: fixed; right: 22px; bottom: 22px; max-width: 420px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 7px; background: #172131; box-shadow: var(--shadow); font-size: 12px; opacity: 0; transform: translateY(10px); pointer-events: none; transition: .2s; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    @media (max-width: 1120px) {
+      .workspace { grid-template-columns: 1fr; }
+      .side-stack { grid-template-columns: 1fr 1fr; }
+      .activity { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute">
+    <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 21h14a2 2 0 0 0 2-2V7l-4-4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Z"/><path d="M7 3v6h8V3M7 21v-8h10v8"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></symbol>
+  </svg>
+
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark"><svg class="icon"><use href="#i-database"/></svg></div>
+      <div><h1>Extrator Agendado de Bases</h1><p>Execução local e agenda diária</p></div>
+    </div>
+    <div class="header-actions">
+      <span class="clock" id="clock">--:--:--</span>
+      <button class="btn" id="saveBtn"><svg class="icon"><use href="#i-save"/></svg>Salvar</button>
+      <button class="btn btn-primary" id="runAllBtn"><svg class="icon"><use href="#i-play"/></svg>Rodar habilitados</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary">
+      <div class="stat"><div class="stat-label">Habilitados</div><div class="stat-value blue" id="statEnabled">0</div><div class="stat-note">extratores ativos</div></div>
+      <div class="stat"><div class="stat-label">Em execução</div><div class="stat-value amber" id="statRunning">0</div><div class="stat-note">processos simultâneos</div></div>
+      <div class="stat"><div class="stat-label">Concluídos</div><div class="stat-value green" id="statSuccess">0</div><div class="stat-note">nesta sessão</div></div>
+      <div class="stat"><div class="stat-label">Próxima agenda</div><div class="stat-value" id="statNext">--:--</div><div class="stat-note" id="statSchedule">agenda desativada</div></div>
+    </section>
+
+    <div class="workspace">
+      <section class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title"><svg class="icon"><use href="#i-database"/></svg>Extratores</div><div class="panel-subtitle">Credenciais e destino independentes por origem</div></div>
+          <span class="panel-subtitle">até 4 em paralelo</span>
+        </div>
+        <div class="extractor-list" id="extractorList"></div>
+      </section>
+
+      <aside class="side-stack">
+        <section class="panel">
+          <div class="panel-head"><div class="panel-title"><svg class="icon"><use href="#i-clock"/></svg>Agendamento</div></div>
+          <div class="schedule-body">
+            <div class="schedule-state">
+              <div><strong>Agenda diária</strong><span id="scheduleHint">Desativada</span></div>
+              <label class="switch"><input type="checkbox" id="scheduleEnabled"><span class="slider"></span></label>
+            </div>
+            <div class="section-label">Horários</div>
+            <div class="time-add">
+              <div class="input-wrap"><input type="time" id="timeInput" value="10:00"></div>
+              <button class="btn btn-small" id="addTimeBtn">Adicionar</button>
+            </div>
+            <div class="time-list" id="timeList"></div>
+            <div class="section-label">Comportamento</div>
+            <div class="option-row"><div><span>Iniciar com o Windows</span><small>Abre o agendador ao entrar</small></div><label class="switch"><input type="checkbox" id="startWithWindows"><span class="slider"></span></label></div>
+            <div class="option-row"><div><span>Continuar na bandeja</span><small>Fechar oculta o painel</small></div><label class="switch"><input type="checkbox" id="closeToTray"><span class="slider"></span></label></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><div class="panel-title"><svg class="icon"><use href="#i-settings"/></svg>Sessão</div></div>
+          <div class="schedule-body">
+            <div class="option-row"><div><span>Versão</span><small id="versionLabel">1.0.0</small></div></div>
+            <div class="option-row"><div><span>Processos ativos</span><small id="activeLabel">Nenhum</small></div></div>
+            <button class="btn btn-danger" style="width:100%;margin-top:15px" id="quitBtn">Encerrar aplicativo</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="panel activity">
+        <div class="panel-head">
+          <div><div class="panel-title">Atividade</div><div class="panel-subtitle">Saída dos extratores na sessão atual</div></div>
+          <div class="log-toolbar"><button class="btn btn-small" id="clearLogBtn"><svg class="icon"><use href="#i-trash"/></svg>Limpar</button></div>
+        </div>
+        <div class="log" id="log"><div class="empty">Nenhuma execução nesta sessão.</div></div>
+      </section>
+    </div>
+  </main>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const IDS = ['siteNovo', 'siteAntigo', 'go', 'rs'];
+    const ICONS = { siteNovo: 'external', siteAntigo: 'database', go: 'database', rs: 'database' };
+    if (!window.extractorApi) {
+      const previewConfig = {
+        scheduleEnabled: true,
+        scheduleTimes: ['10:00', '10:30', '14:00'],
+        startWithWindows: true,
+        closeToTray: true,
+        extractors: {
+          siteNovo: { enabled: true, username: 'operador', passwordConfigured: true, outputDir: 'C:\\Bases\\Site Novo', meta: { label: 'Site Novo', output: '01_Todos_Aberto.xls e 02_Todos_Pendente.xls' } },
+          siteAntigo: { enabled: true, username: 'operador', passwordConfigured: true, outputDir: 'C:\\Bases\\Site Antigo', meta: { label: 'Site Antigo / BKO All', output: 'bko_all.csv' } },
+          go: { enabled: true, username: 'operador', passwordConfigured: true, outputDir: 'C:\\Bases\\GO', meta: { label: 'GO', output: 'EQTL_GO.csv' } },
+          rs: { enabled: true, username: 'operador', passwordConfigured: true, outputDir: 'C:\\Bases\\RS', meta: { label: 'RS / CEEE', output: 'EQTL_RS.csv' } },
+        },
+      };
+      const previewState = { config: previewConfig, runtime: Object.fromEntries(IDS.map(id => [id, { status: 'idle', message: 'Aguardando' }])), schedule: { enabled: true, nextRun: '10:30' }, runningIds: [], version: '1.0.0' };
+      window.extractorApi = {
+        getState: async () => previewState,
+        saveConfig: async () => ({ ok: true, state: previewState }),
+        chooseFolder: async current => current,
+        openFolder: async () => ({ ok: true }),
+        run: async ids => ({ ok: true, successes: ids.length, total: ids.length }),
+        cancel: async () => ({ ok: true }),
+        quit: async () => true,
+        onState: () => {},
+        onLog: () => {},
+      };
+    }
+    let appState = null;
+    let scheduleTimes = [];
+    let logStarted = false;
+
+    const icon = name => `<svg class="icon"><use href="#i-${name}"/></svg>`;
+    const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove('show'), 3200);
+    }
+
+    function extractorTemplate(id, config, runtime) {
+      const running = runtime.status === 'running';
+      const statusLabel = { idle: 'Aguardando', running: 'Executando', success: 'Concluído', error: 'Erro' }[runtime.status] || 'Aguardando';
+      return `<article class="extractor" data-id="${id}">
+        <div class="extractor-top">
+          <div class="source-icon">${icon(ICONS[id])}</div>
+          <div><div class="source-name">${escapeHtml(config.meta.label)}</div><div class="source-output">${escapeHtml(config.meta.output)}</div></div>
+          <div class="status ${runtime.status}"><span class="status-dot"></span><span>${statusLabel}</span></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <label class="switch"><input type="checkbox" id="enabled-${id}" ${config.enabled ? 'checked' : ''}><span class="slider"></span></label>
+            <button class="btn btn-small ${running ? 'btn-danger' : ''}" data-run="${id}">${running ? icon('stop') + 'Parar' : icon('play') + 'Rodar'}</button>
+          </div>
+        </div>
+        <div class="extractor-fields">
+          <div class="field"><label>Usuário</label><div class="input-wrap"><input id="user-${id}" value="${escapeHtml(config.username)}" autocomplete="off"></div></div>
+          <div class="field"><label>Senha</label><div class="input-wrap"><input id="pass-${id}" type="password" placeholder="${config.passwordConfigured ? 'Senha salva' : 'Digite a senha'}" autocomplete="new-password"></div></div>
+          <div class="field"><label>Pasta de saída</label><div class="input-wrap"><input id="path-${id}" value="${escapeHtml(config.outputDir)}"><button class="input-action" data-folder="${id}" title="Escolher pasta">${icon('folder')}</button><button class="input-action" data-open="${id}" title="Abrir pasta">${icon('external')}</button></div></div>
+        </div>
+        ${runtime.message && runtime.status !== 'idle' ? `<div class="panel-subtitle" style="margin-top:9px">${escapeHtml(runtime.message)}</div>` : ''}
+      </article>`;
+    }
+
+    function render(state) {
+      appState = state;
+      const list = document.getElementById('extractorList');
+      list.innerHTML = IDS.map(id => extractorTemplate(id, state.config.extractors[id], state.runtime[id])).join('');
+      scheduleTimes = [...state.config.scheduleTimes];
+      document.getElementById('scheduleEnabled').checked = state.config.scheduleEnabled;
+      document.getElementById('startWithWindows').checked = state.config.startWithWindows;
+      document.getElementById('closeToTray').checked = state.config.closeToTray;
+      document.getElementById('versionLabel').textContent = state.version;
+      renderTimes();
+      bindDynamicEvents();
+      updateSummary();
+    }
+
+    function updateSummary() {
+      if (!appState) return;
+      const configs = appState.config.extractors;
+      const runtime = appState.runtime;
+      document.getElementById('statEnabled').textContent = IDS.filter(id => configs[id].enabled).length;
+      document.getElementById('statRunning').textContent = IDS.filter(id => runtime[id].status === 'running').length;
+      document.getElementById('statSuccess').textContent = IDS.filter(id => runtime[id].status === 'success').length;
+      document.getElementById('statNext').textContent = appState.schedule.nextRun || '--:--';
+      document.getElementById('statSchedule').textContent = appState.schedule.enabled ? `${scheduleTimes.length} horário(s) diário(s)` : 'agenda desativada';
+      document.getElementById('scheduleHint').textContent = appState.schedule.enabled ? `Próxima: ${appState.schedule.nextRun || '-'}` : 'Desativada';
+      document.getElementById('activeLabel').textContent = appState.runningIds.length ? appState.runningIds.map(id => appState.config.extractors[id].meta.label).join(', ') : 'Nenhum';
+      document.getElementById('runAllBtn').disabled = appState.runningIds.length > 0;
+    }
+
+    function renderTimes() {
+      const target = document.getElementById('timeList');
+      target.innerHTML = scheduleTimes.length
+        ? scheduleTimes.map(time => `<span class="time-chip">${time}<button data-remove-time="${time}" title="Remover">×</button></span>`).join('')
+        : '<span class="panel-subtitle">Nenhum horário configurado</span>';
+      target.querySelectorAll('[data-remove-time]').forEach(button => button.onclick = () => {
+        scheduleTimes = scheduleTimes.filter(time => time !== button.dataset.removeTime);
+        renderTimes();
+      });
+    }
+
+    function collectConfig() {
+      return {
+        scheduleEnabled: document.getElementById('scheduleEnabled').checked,
+        scheduleTimes,
+        startWithWindows: document.getElementById('startWithWindows').checked,
+        closeToTray: document.getElementById('closeToTray').checked,
+        extractors: Object.fromEntries(IDS.map(id => [id, {
+          enabled: document.getElementById(`enabled-${id}`).checked,
+          username: document.getElementById(`user-${id}`).value,
+          password: document.getElementById(`pass-${id}`).value,
+          outputDir: document.getElementById(`path-${id}`).value,
+        }])),
+      };
+    }
+
+    async function saveConfig(showMessage = true) {
+      const result = await window.extractorApi.saveConfig(collectConfig());
+      if (!result.ok) throw new Error(result.msg || 'Falha ao salvar.');
+      render(result.state);
+      if (showMessage) showToast('Configurações salvas com segurança.');
+    }
+
+    function bindDynamicEvents() {
+      document.querySelectorAll('[data-folder]').forEach(button => button.onclick = async () => {
+        const id = button.dataset.folder;
+        const input = document.getElementById(`path-${id}`);
+        const selected = await window.extractorApi.chooseFolder(input.value);
+        if (selected) input.value = selected;
+      });
+      document.querySelectorAll('[data-open]').forEach(button => button.onclick = () => {
+        window.extractorApi.openFolder(document.getElementById(`path-${button.dataset.open}`).value);
+      });
+      document.querySelectorAll('[data-run]').forEach(button => button.onclick = async () => {
+        const id = button.dataset.run;
+        if (appState.runningIds.includes(id)) {
+          await window.extractorApi.cancel(id);
+          return;
+        }
+        try {
+          await saveConfig(false);
+          const result = await window.extractorApi.run([id]);
+          showToast(result.ok ? 'Extração concluída.' : (result.results?.[0]?.msg || result.msg || 'A extração falhou.'));
+        } catch (error) { showToast(error.message); }
+      });
+    }
+
+    function appendLog(entry) {
+      const target = document.getElementById('log');
+      if (!logStarted) { target.innerHTML = ''; logStarted = true; }
+      const time = new Date(entry.timestamp).toLocaleTimeString('pt-BR');
+      const source = entry.id === 'system' ? 'SISTEMA' : (appState?.config.extractors[entry.id]?.meta.label || entry.id);
+      const typeClass = entry.type === 'error' ? 'log-error' : entry.type === 'success' ? 'log-success' : '';
+      const row = document.createElement('div');
+      row.className = `log-line ${typeClass}`;
+      row.innerHTML = `<span class="log-time">${time}</span><span class="log-source">${escapeHtml(source)}</span><span>${escapeHtml(entry.line)}</span>`;
+      target.appendChild(row);
+      target.scrollTop = target.scrollHeight;
+    }
+
+    document.getElementById('saveBtn').onclick = () => saveConfig().catch(error => showToast(error.message));
+    document.getElementById('runAllBtn').onclick = async () => {
+      try {
+        await saveConfig(false);
+        const ids = IDS.filter(id => document.getElementById(`enabled-${id}`).checked);
+        const result = await window.extractorApi.run(ids);
+        showToast(`${result.successes || 0}/${result.total || ids.length} extrações concluídas.`);
+      } catch (error) { showToast(error.message); }
+    };
+    document.getElementById('addTimeBtn').onclick = () => {
+      const value = document.getElementById('timeInput').value;
+      if (!value) return;
+      scheduleTimes = [...new Set([...scheduleTimes, value])].sort();
+      renderTimes();
+    };
+    document.getElementById('clearLogBtn').onclick = () => {
+      document.getElementById('log').innerHTML = '<div class="empty">Nenhuma execução nesta sessão.</div>';
+      logStarted = false;
+    };
+    document.getElementById('quitBtn').onclick = () => window.extractorApi.quit();
+    window.extractorApi.onState(render);
+    window.extractorApi.onLog(appendLog);
+
+    setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleString('pt-BR'); }, 1000);
+    window.extractorApi.getState().then(render).catch(error => showToast(error.message));
+  </script>
+</body>
+</html>

@@ -4,6 +4,8 @@ Aplicacao desktop Electron para gerar a base `mesa_distribuicao.csv`, consultar 
 
 O projeto foi preparado para empacotamento Windows com `electron-builder`, gerando instalador e versao portable em `.exe`.
 
+O repositorio tambem possui o aplicativo independente **Extrator Agendado de Bases**, localizado em `extractor-app/`. Ele executa somente os quatro extratores, permite pasta e credenciais por origem, execucao concorrente e agenda diaria com varios horarios. Consulte [extractor-app/README.md](extractor-app/README.md).
+
 ## Objetivo
 
 - Gerar o CSV operacional no padrao da aba `MESA DE DISTRIBUICAO` do BI.

@@ -2209,8 +2209,8 @@ function selectedLimpezaRecords() {
 async function limparTratadosFora(options = {}) {
   const auto = options.auto === true;
   setProcessStatus('run', 'Comparando mesa com bases atuais...');
-  logLimpeza('Iniciando comparacao: protocolos na mesa que nao existem ou nao entram nas bases atuais.');
-  if (auto) appendAutoHistory('Comparando tratados fora apos subida da mesa');
+  logLimpeza('Iniciando comparacao: protocolos fora das bases atuais e copias duplicadas na mesa.');
+  if (auto) appendAutoHistory('Comparando tratados fora e duplicatas apos subida da mesa');
 
   try {
     const preview = await api.previewTratadosFora();
@@ -2227,14 +2227,15 @@ async function limparTratadosFora(options = {}) {
     const aviso = [
       `Mesa consultada: ${fmtN(preview.totalMesa || 0)} conversa(s).`,
       `Protocolos nas bases atuais: ${fmtN(preview.totalBase || 0)}.`,
-      `Tratados fora encontrados: ${fmtN(candidatos.length)}.`,
+      `Itens fora da base ou duplicados: ${fmtN(candidatos.length)}.`,
+      preview.duplicatasExtras ? `Duplicatas extras detectadas: ${fmtN(preview.duplicatasExtras)} em ${fmtN(preview.protocolosDuplicados || 0)} protocolo(s).` : '',
       preview.semProtocolo ? `Ignorados sem protocolo identificado: ${fmtN(preview.semProtocolo)}.` : '',
       preview.errors?.length ? `Avisos de leitura: ${preview.errors.slice(0, 3).join(' | ')}` : '',
     ].filter(Boolean).join(' ');
 
     document.getElementById('limpaPreviewResumo').textContent = candidatos.length
-      ? `${fmtN(candidatos.length)} tratado(s) fora selecionado(s). Estados: ${resumo || '-'}.`
-      : 'Nenhum protocolo da mesa ficou fora das bases atuais.';
+      ? `${fmtN(candidatos.length)} item(ns) fora da base ou duplicado(s) selecionado(s). Estados: ${resumo || '-'}.`
+      : 'Nenhum protocolo fora da base ou duplicado foi encontrado na mesa.';
     updateCleanupProgress({
       total: preview.totalMesa || 0,
       processed: 0,
@@ -2242,21 +2243,22 @@ async function limparTratadosFora(options = {}) {
       error: 0,
       pending: candidatos.length,
       msg: candidatos.length
-        ? (auto ? 'Tratados fora selecionados para limpeza automatica.' : 'Tratados fora selecionados. Aguardando confirmacao.')
-        : 'Nenhum tratado fora encontrado.',
+        ? (auto ? 'Tratados fora e duplicatas selecionados para limpeza automatica.' : 'Tratados fora e duplicatas selecionados. Aguardando confirmacao.')
+        : 'Nenhum tratado fora ou duplicata encontrado.',
     });
     logLimpeza(aviso);
 
     if (!candidatos.length) {
-      setProcessStatus('ok', 'Nenhum tratado fora encontrado');
-      toast('Nenhum protocolo da mesa ficou fora das bases atuais.', 'ok');
+      setProcessStatus('ok', 'Nenhum tratado fora ou duplicata encontrado');
+      toast('Nenhum protocolo fora da base ou duplicado foi encontrado.', 'ok');
       return;
     }
 
     if (!auto) {
       const okConfirm = confirm(
         `Limpar tratados fora\n\n` +
-        `Foram encontrados ${fmtN(candidatos.length)} protocolo(s) na mesa que nao existem ou nao entram nas bases atuais.\n\n` +
+        `Foram encontrados ${fmtN(candidatos.length)} item(ns) fora da base ou duplicado(s) na mesa.\n\n` +
+        `Duplicatas extras: ${fmtN(preview.duplicatasExtras || 0)} em ${fmtN(preview.protocolosDuplicados || 0)} protocolo(s).\n\n` +
         `Estados: ${resumo || '-'}\n\n` +
         `Sem protocolo identificado foram ignorados: ${fmtN(preview.semProtocolo || 0)}.\n\n` +
         `A limpeza sera real e somente nesses itens selecionados.\n\n` +
@@ -2268,7 +2270,7 @@ async function limparTratadosFora(options = {}) {
         return;
       }
     } else {
-      appendAutoHistory(`Limpando ${fmtN(candidatos.length)} tratado(s) fora automaticamente`);
+      appendAutoHistory(`Limpando ${fmtN(candidatos.length)} tratado(s) fora ou duplicado(s) automaticamente`);
     }
 
     setProcessStatus('run', 'Limpando tratados fora...');

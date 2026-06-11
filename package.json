@@ -1,7 +1,7 @@
 {
   "name": "mesa-distribuicao-bko",
   "productName": "ADM Mesa de Distribuição",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "ADM Mesa de Distribuicao - Painel desktop Backoffice",
   "main": "main.js",
   "author": "BackOffice",
@@ -10,8 +10,8 @@
     "dev": "electron . --dev",
     "smoke": "electron . --smoke-test",
     "lint": "npm run check",
-    "test": "npm run check",
-    "check": "node --check main.js && node --check preload.js && node --check scripts/mesa-upload.js && node --check scripts/extracao/shared.js && node --check scripts/extracao/playwright-fallback.js && node --check scripts/extracao/site-novo.js && node --check scripts/extracao/site-antigo.js && node --check scripts/extracao/go.js && node --check scripts/extracao/rs.js",
+    "test": "npm run check && node scripts/extracao/output-validation.test.js",
+    "check": "node --check main.js && node --check preload.js && node --check scripts/mesa-upload.js && node --check scripts/extracao/shared.js && node --check scripts/extracao/output-validation.js && node --check scripts/extracao/playwright-fallback.js && node --check scripts/extracao/site-novo.js && node --check scripts/extracao/site-antigo.js && node --check scripts/extracao/go.js && node --check scripts/extracao/rs.js && npm run extractor-app:check",
     "build": "npm run check && electron-builder --dir",
     "dist": "npm run dist:win",
     "dist:win": "npm run check && electron-builder --win --x64",
@@ -22,7 +22,10 @@
     "extract:go": "node scripts/extracao/go.js",
     "extract:rs": "node scripts/extracao/rs.js",
     "extract:all": "node scripts/extracao/site-novo.js && node scripts/extracao/site-antigo.js && node scripts/extracao/go.js && node scripts/extracao/rs.js",
-    "upload:mesa": "node scripts/mesa-upload.js inputMesa/mesa_distribuicao.csv"
+    "upload:mesa": "node scripts/mesa-upload.js inputMesa/mesa_distribuicao.csv",
+    "extractor-app:start": "electron extractor-app",
+    "extractor-app:check": "node --check extractor-app/main.js && node --check extractor-app/preload.js",
+    "extractor-app:dist": "npm run extractor-app:check && electron-builder --config extractor-app/electron-builder.yml --win --x64"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

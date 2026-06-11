@@ -5,6 +5,7 @@ legacy/**/node_modules/
 
 # Builds e pacotes
 dist/
+dist-extrator/
 build/
 out/
 release/

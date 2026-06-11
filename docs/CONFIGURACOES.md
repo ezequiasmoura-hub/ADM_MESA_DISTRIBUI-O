@@ -299,6 +299,15 @@ EXTRACAO_RS_SENHA=senha_rs
 
 A credencial especifica tem prioridade sobre a geral.
 
+### Retentativa e validacao das bases
+
+```env
+EXTRACTION_RETRY_DELAY_SECONDS=15
+EXTRACTION_MAX_ATTEMPTS=0
+```
+
+Site Antigo, GO e RS somente terminam com sucesso quando o CSV foi atualizado na tentativa atual, possui o cabecalho esperado e contem pelo menos um registro. Erros e arquivos zerados aguardam o intervalo configurado e executam novamente. `EXTRACTION_MAX_ATTEMPTS=0` significa tentativas ilimitadas; um valor positivo limita a quantidade de tentativas.
+
 ### `EXTRACAO_HEADLESS`
 
 ```env

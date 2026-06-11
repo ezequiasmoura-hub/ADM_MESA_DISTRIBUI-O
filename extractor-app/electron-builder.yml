@@ -1,0 +1,46 @@
+appId: br.com.backoffice.extrator-agendado-bases
+productName: Extrator Agendado de Bases
+copyright: Copyright © 2026 BackOffice
+asar: false
+
+extraMetadata:
+  name: extrator-agendado-de-bases
+  productName: Extrator Agendado de Bases
+  version: 1.0.0
+  main: extractor-app/main.js
+
+directories:
+  output: dist-extrator
+  buildResources: assets
+
+files:
+  - extractor-app/**/*
+  - scripts/extracao/**/*
+  - assets/icon.ico
+  - package.json
+  - "!**/.env"
+  - "!**/*.log"
+
+win:
+  icon: assets/icon.ico
+  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  artifactName: Extrator-Agendado-de-Bases-${version}-Setup-${arch}.${ext}
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Extrator Agendado de Bases
+
+portable:
+  artifactName: Extrator-Agendado-de-Bases-${version}-Portable-${arch}.${ext}

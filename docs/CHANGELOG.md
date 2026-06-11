@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.8.0 - 2026-06-11
+
+### Melhorias
+
+- A funcao **Limpar tratados fora** passa a identificar protocolos duplicados na mesa.
+- Quando um protocolo valido aparece mais de uma vez, uma conversa e mantida e somente as copias extras entram na limpeza.
+- O modo automatico utiliza a mesma regra e remove tratados fora e duplicatas depois da subida da mesa.
+- Site Antigo, GO e RS passam a repetir automaticamente a extracao quando houver erro ou quando o CSV estiver vazio, antigo ou invalido.
+- O fluxo automatico somente continua para geracao e subida depois que as tres bases forem atualizadas com registros validos.
+- O aplicativo independente de extracao aplica a mesma validacao e retentativa, preservando o arquivo anterior quando uma tentativa retorna zero registros.
+
 ## 2.7.0 - 2026-06-08
 
 ### Melhorias

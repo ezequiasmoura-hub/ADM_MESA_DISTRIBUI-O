@@ -14,7 +14,7 @@ const SCRIPT_ENV_KEYS = {
 };
 const scriptKey = SCRIPT_ENV_KEYS[path.basename(process.argv[1] || '')] || '';
 
-const BASE_DIR = process.env.EXTRACAO_BASE_DIR || 'H:\\TEMOTEO - NAO ABRA\\Base';
+const BASE_DIR = process.env.EXTRACAO_BASE_DIR || 'H:\\TEMOTEO - NAO ABRA\\Base\\rpa ezequias';
 const USERNAME = (scriptKey && process.env[`EXTRACAO_${scriptKey}_USUARIO`])
   || process.env.EXTRACAO_USUARIO
   || process.env.RPA_USUARIO

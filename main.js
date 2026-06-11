@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const { spawn } = require('child_process');
+const { validateCsvOutput } = require('./scripts/extracao/output-validation');
 let autoUpdater = null;
 try {
   ({ autoUpdater } = require('electron-updater'));
@@ -57,6 +58,7 @@ const LEGACY_MESA_QUEUE_IDS = [
 ];
 
 const EXTRACTION_IDS = ['siteNovo', 'siteAntigo', 'go', 'rs'];
+const RETRYABLE_EXTRACTION_IDS = new Set(['siteAntigo', 'go', 'rs']);
 const EXTRACTION_ENV_KEYS = {
   siteNovo: 'SITE_NOVO',
   siteAntigo: 'SITE_ANTIGO',
@@ -1071,6 +1073,15 @@ function getExtractionCredentials(id) {
   };
 }
 
+function getExtractionOutputDir(id) {
+  const outputPath = {
+    siteAntigo: CONFIG.PATH_BKO_ALL,
+    go: CONFIG.PATH_EQTL_GO,
+    rs: CONFIG.PATH_EQTL_RS,
+  }[id];
+  return outputPath ? path.dirname(outputPath) : '';
+}
+
 function getExtractionEnv(id) {
   const key = EXTRACTION_ENV_KEYS[id];
   const creds = getExtractionCredentials(id);
@@ -1084,6 +1095,11 @@ function getExtractionEnv(id) {
     env.EXTRACAO_SENHA = creds.password;
     env.RPA_SENHA = creds.password;
     if (key) env[`EXTRACAO_${key}_SENHA`] = creds.password;
+  }
+  const outputDir = getExtractionOutputDir(id);
+  if (outputDir) {
+    env.EXTRACAO_OUTPUT_DIR = outputDir;
+    env.EXTRACAO_BASE_DIR = outputDir;
   }
   return env;
 }
@@ -1117,7 +1133,7 @@ function appendExtractionLogFile(logPath, text) {
   fs.appendFileSync(logPath, sanitizeProcessOutput(text), 'utf8');
 }
 
-function runExtractionScript(id) {
+function runExtractionScriptOnce(id, attempt = 1) {
   const script = getExtractionConfig(id);
   if (!script) return Promise.resolve({ id, ok: false, msg: `Script desconhecido: ${id}` });
 
@@ -1128,6 +1144,7 @@ function runExtractionScript(id) {
       ok: false,
       label: script.label,
       msg: `Script nao encontrado: ${scriptPath || '(caminho vazio)'}`,
+      retryable: false,
     });
   }
 
@@ -1137,10 +1154,11 @@ function runExtractionScript(id) {
   const logDir = ensureDir(getLogDir('extracoes'));
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const logPath = path.join(logDir, `${id}_${ts}.log`);
+  const attemptStartedAt = Date.now();
 
   return new Promise(resolve => {
-    emitExtractionLog(id, `Iniciando ${script.label}...`, 'info');
-    appendExtractionLogFile(logPath, `[${new Date().toISOString()}] ${script.label}\n`);
+    emitExtractionLog(id, `Iniciando ${script.label} - tentativa ${attempt}...`, 'info');
+    appendExtractionLogFile(logPath, `[${new Date().toISOString()}] ${script.label} - tentativa ${attempt}\n`);
     appendExtractionLogFile(logPath, `runtime=${runtime}\nscript=${scriptPath}\ncwd=${cwd}\n\n`);
 
     const child = spawn(runtime, [...getExtractionNodeArgs(), scriptPath], {
@@ -1156,6 +1174,7 @@ function runExtractionScript(id) {
     });
 
     let outputTail = '';
+    let settled = false;
     const handleChunk = (chunk, type) => {
       const text = sanitizeProcessOutput(chunk.toString());
       outputTail = (outputTail + text).slice(-6000);
@@ -1167,20 +1186,48 @@ function runExtractionScript(id) {
     child.stderr.on('data', chunk => handleChunk(chunk, 'err'));
 
     child.on('error', error => {
+      if (settled) return;
+      settled = true;
       const msg = sanitizeProcessOutput(error.message);
       appendExtractionLogFile(logPath, `\n[ERRO] ${msg}\n`);
       emitExtractionLog(id, msg, 'err');
-      resolve({ id, ok: false, label: script.label, msg, logPath, outputTail });
+      resolve({ id, ok: false, label: script.label, msg, logPath, outputTail, attempt, retryable: true });
     });
 
     child.on('close', code => {
-      const ok = code === 0;
-      const msg = ok ? `${script.label} concluido.` : `${script.label} terminou com codigo ${code}.`;
+      if (settled) return;
+      settled = true;
+      let validation = null;
+      if (code === 0 && RETRYABLE_EXTRACTION_IDS.has(id)) {
+        validation = validateCsvOutput(id, getExtractionOutputDir(id), { notBeforeMs: attemptStartedAt });
+      }
+      const ok = code === 0 && (!validation || validation.ok);
+      const msg = ok
+        ? `${script.label} concluido${validation ? ` com ${validation.rows} registro(s)` : ''}.`
+        : (validation?.message || `${script.label} terminou com codigo ${code}.`);
       appendExtractionLogFile(logPath, `\n[${new Date().toISOString()}] ${msg}\n`);
       emitExtractionLog(id, msg, ok ? 'ok' : 'err');
-      resolve({ id, ok, label: script.label, code, msg, logPath, outputTail });
+      resolve({ id, ok, label: script.label, code, msg, logPath, outputTail, attempt, validation, retryable: true });
     });
   });
+}
+
+async function runExtractionScript(id) {
+  const retryDelaySeconds = Math.max(1, Number(process.env.EXTRACTION_RETRY_DELAY_SECONDS) || 15);
+  const maxAttempts = Math.max(0, Number(process.env.EXTRACTION_MAX_ATTEMPTS) || 0);
+  let attempt = 0;
+
+  while (true) {
+    attempt += 1;
+    const result = await runExtractionScriptOnce(id, attempt);
+    if (result.ok || !RETRYABLE_EXTRACTION_IDS.has(id) || result.retryable === false) return result;
+    if (maxAttempts > 0 && attempt >= maxAttempts) return result;
+
+    const retryMsg = `${result.msg} Nova tentativa em ${retryDelaySeconds}s (tentativa ${attempt + 1}).`;
+    emitExtractionLog(id, retryMsg, 'err');
+    appendExtractionLogFile(result.logPath, `[${new Date().toISOString()}] ${retryMsg}\n`);
+    await delay(retryDelaySeconds * 1000);
+  }
 }
 
 async function runExtractionScriptTracked(id) {
@@ -1960,6 +2007,7 @@ ipcMain.handle('preview-tratados-fora', async () => {
     const errors = mesa.enrichmentErrors || [];
     const totalBase = Number(mesa.totalBaseOrigem || 0);
     const candidatos = [];
+    const registrosPorProtocolo = new Map();
     let semProtocolo = 0;
     let aindaNaBase = 0;
 
@@ -1969,24 +2017,54 @@ ipcMain.handle('preview-tratados-fora', async () => {
         semProtocolo++;
         continue;
       }
-      const sourceEligible = record.sourceMatched && !isBiMesaExcludedService(record.tipoServico);
-      if (sourceEligible) {
-        aindaNaBase++;
-        continue;
-      }
-      candidatos.push({
-        ...record,
+      const registros = registrosPorProtocolo.get(protocolo) || [];
+      registros.push({
+        record,
         protocolo,
-        motivoTratadoFora: record.sourceMatched
-          ? 'Tipo de servico excluido da base de distribuicao'
-          : 'Protocolo nao encontrado nas bases de origem configuradas',
+        sourceEligible: record.sourceMatched && !isBiMesaExcludedService(record.tipoServico),
       });
+      registrosPorProtocolo.set(protocolo, registros);
+    }
+
+    let protocolosDuplicados = 0;
+    let duplicatasExtras = 0;
+
+    for (const registros of registrosPorProtocolo.values()) {
+      if (registros.length > 1) {
+        protocolosDuplicados++;
+        duplicatasExtras += registros.length - 1;
+      }
+
+      // Mantem apenas uma conversa quando o protocolo ainda pertence a base.
+      // As demais copias entram na mesma fila segura de limpeza dos tratados fora.
+      const registroMantido = registros.find(item => item.sourceEligible) || null;
+
+      for (const item of registros) {
+        if (item === registroMantido) {
+          aindaNaBase++;
+          continue;
+        }
+
+        const duplicado = registros.length > 1;
+        candidatos.push({
+          ...item.record,
+          protocolo: item.protocolo,
+          protocoloDuplicado: duplicado,
+          motivoTratadoFora: item.sourceEligible
+            ? 'Copia duplicada do protocolo na mesa'
+            : (item.record.sourceMatched
+              ? 'Tipo de servico excluido da base de distribuicao'
+              : 'Protocolo nao encontrado nas bases de origem configuradas'),
+        });
+      }
     }
 
     appendAppLog('info', 'Preview tratados fora concluido', {
       totalMesa: mesa.records?.length || 0,
       totalBase,
       candidatos: candidatos.length,
+      protocolosDuplicados,
+      duplicatasExtras,
       semProtocolo,
       aindaNaBase,
       errors,
@@ -1997,13 +2075,15 @@ ipcMain.handle('preview-tratados-fora', async () => {
       totalMesa: mesa.records?.length || 0,
       totalBase,
       totalTratadosFora: candidatos.length,
+      protocolosDuplicados,
+      duplicatasExtras,
       semProtocolo,
       aindaNaBase,
       records: mesa.records || [],
       candidatos,
       errors,
       progresso,
-      msg: `${candidatos.length} conversa(s) na mesa nao aparecem nas bases atuais.`,
+      msg: `${candidatos.length} conversa(s) fora da base ou duplicadas foram selecionadas.`,
     };
   } catch (e) {
     appendAppLog('error', 'Falha no preview de tratados fora', { error: e.message });

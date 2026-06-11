@@ -6,12 +6,13 @@ const {
   requireCredentials,
   writeCsv,
 } = require('./shared');
+const { assertNonEmptyRows } = require('./output-validation');
 
 const REGIOES = (process.env.EXTRACAO_ANTIGO_REGIOES || 'csa,pi,pa,ma,al,ap')
   .split(',')
   .map(region => region.trim().toLowerCase())
   .filter(Boolean);
-const OUTPUT_FILE = path.join(BASE_DIR, 'bko_all.csv');
+const OUTPUT_FILE = path.join(process.env.EXTRACAO_OUTPUT_DIR || BASE_DIR, 'bko_all.csv');
 const CONCORRENCIA_HTTP = Number(process.env.EXTRACAO_ANTIGO_CONCORRENCIA) || 20;
 const CONCORRENCIA_REGIOES = Number(process.env.EXTRACAO_ANTIGO_CONCORRENCIA_REGIOES) || REGIOES.length || 1;
 const HTTP_TIMEOUT_MS = Number(process.env.EXTRACAO_ANTIGO_TIMEOUT_MS) || 30000;
@@ -189,9 +190,10 @@ async function fetchPage(context, baseUrl, pageNum, rName, timeReport) {
         maxRedirects: 5,
       });
 
-      if (!response.ok()) {
+      if (response.status() === 404) {
         return { pageNum, rows: [], hasTable: false, hasNext: false };
       }
+      if (!response.ok()) throw new Error(`pagina ${pageNum} retornou HTTP ${response.status()}`);
 
       const html = await response.text();
       if (html.includes('id="login"')) {
@@ -207,8 +209,7 @@ async function fetchPage(context, baseUrl, pageNum, rName, timeReport) {
     }
   }
 
-  console.warn(`[${rName}] Falha na pagina ${pageNum}: ${lastError?.message || 'erro desconhecido'}`);
-  return { pageNum, rows: [], hasTable: false, hasNext: false };
+  throw new Error(`[${rName}] Falha na pagina ${pageNum}: ${lastError?.message || 'erro desconhecido'}`);
 }
 
 async function scrapeRegion(region) {
@@ -270,6 +271,7 @@ async function run() {
       'protocolo_secundario',
       'data_relatorio',
     ];
+    assertNonEmptyRows(allData, 'Extracao Site Antigo');
     writeCsv(OUTPUT_FILE, allData, columns);
     console.log(`Site Antigo salvo: ${OUTPUT_FILE} (${allData.length} registros)`);
   } catch (error) {
