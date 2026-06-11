@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.8.1 - 2026-06-11
+
+### Correcao
+
+- A subida integrada passa a enviar a coluna `Prioridade` do CSV no campo nativo `priority` da conversa Genesys.
+- Valores ausentes ou invalidos usam prioridade `0`; a prioridade efetivamente enviada fica registrada no log da subida.
+
 ## 2.8.0 - 2026-06-11
 
 ### Melhorias

@@ -138,6 +138,8 @@ Header:
 Regiao;Nota;Conclusao_desejada;Mandante;Protocolo;Tipo_de_servico;Coluna;Dados;Skill;Fluxo;Prioridade;STATUS_PRAZO_MESA
 ```
 
+Na subida integrada, `Prioridade` e convertida para inteiro e enviada tanto nos atributos quanto no campo nativo `priority` da conversa. Assim, filas configuradas para pontuacao por prioridade podem respeitar a ordenacao calculada pela base.
+
 ## Extracoes
 
 `runExtractionScript(id)` executa os scripts via `spawn`.

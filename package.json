@@ -1,7 +1,7 @@
 {
   "name": "mesa-distribuicao-bko",
   "productName": "ADM Mesa de Distribuição",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "description": "ADM Mesa de Distribuicao - Painel desktop Backoffice",
   "main": "main.js",
   "author": "BackOffice",
@@ -10,7 +10,7 @@
     "dev": "electron . --dev",
     "smoke": "electron . --smoke-test",
     "lint": "npm run check",
-    "test": "npm run check && node scripts/extracao/output-validation.test.js",
+    "test": "npm run check && node scripts/extracao/output-validation.test.js && node scripts/mesa-upload.test.js",
     "check": "node --check main.js && node --check preload.js && node --check scripts/mesa-upload.js && node --check scripts/extracao/shared.js && node --check scripts/extracao/output-validation.js && node --check scripts/extracao/playwright-fallback.js && node --check scripts/extracao/site-novo.js && node --check scripts/extracao/site-antigo.js && node --check scripts/extracao/go.js && node --check scripts/extracao/rs.js && npm run extractor-app:check",
     "build": "npm run check && electron-builder --dir",
     "dist": "npm run dist:win",

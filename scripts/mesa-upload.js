@@ -133,6 +133,14 @@ function parseCsv(text, delimiter = ';') {
     });
 }
 
+function parseNativePriority(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return 0;
+  const parsed = Number(raw.replace(',', '.'));
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.trunc(parsed);
+}
+
 function parseCredentialLine(line, index) {
   const parts = String(line || '').split('|').map(part => part.trim());
   if (parts.length >= 3) {
@@ -253,15 +261,17 @@ function buildPayload(row, regionConfig) {
 
   const nota = attr.Nota || attr.Protocolo || 'sem-nota';
   const flowId = String(row.Fluxo || '').trim();
+  const priority = parseNativePriority(row.Prioridade ?? row.prioridade);
   if (!flowId) return { skip: true, nota, reason: 'Fluxo vazio' };
 
   return {
     nota,
+    priority,
     payload: {
       provider: regionConfig.provider,
       skillIds: [''],
       languageId: '',
-      priority: 0,
+      priority,
       toAddress: regionConfig.toAddress,
       fromName: '',
       attributes: attr,
@@ -301,7 +311,7 @@ async function postEmail({ row, tokenService, regionConfig, logger, waitTurn, dr
   }
 
   if (dryRun) {
-    logger.write({ status: 'dry_run', nota: built.nota, cred: credName });
+    logger.write({ status: 'dry_run', nota: built.nota, priority: built.priority, cred: credName });
     return { status: 'dry_run', nota: built.nota, cred: credName };
   }
 
@@ -324,11 +334,11 @@ async function postEmail({ row, tokenService, regionConfig, logger, waitTurn, dr
       });
       const text = await response.text().catch(() => '');
       if (SUCCESS_CODES.has(response.status)) {
-        logger.write({ status: 'success', nota: built.nota, cred: credName, statusCode: response.status });
+        logger.write({ status: 'success', nota: built.nota, priority: built.priority, cred: credName, statusCode: response.status });
         return { status: 'success', nota: built.nota, cred: credName };
       }
       if ([400, 401, 403, 404, 409].includes(response.status)) {
-        logger.write({ status: 'error', nota: built.nota, cred: credName, statusCode: response.status, response: text.slice(0, 1000) });
+        logger.write({ status: 'error', nota: built.nota, priority: built.priority, cred: credName, statusCode: response.status, response: text.slice(0, 1000) });
         return { status: 'error', nota: built.nota, cred: credName, statusCode: response.status };
       }
       if (response.status === 429) {
@@ -347,7 +357,7 @@ async function postEmail({ row, tokenService, regionConfig, logger, waitTurn, dr
     }
   }
 
-  logger.write({ status: 'exception', nota: built.nota, cred: credName, error: lastMessage });
+  logger.write({ status: 'exception', nota: built.nota, priority: built.priority, cred: credName, error: lastMessage });
   return { status: 'exception', nota: built.nota, cred: credName, error: lastMessage };
 }
 
@@ -474,7 +484,14 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  console.error(`[UPLOAD] Erro fatal: ${error.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(error => {
+    console.error(`[UPLOAD] Erro fatal: ${error.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  buildPayload,
+  parseNativePriority,
+};
